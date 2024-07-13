@@ -1,0 +1,20 @@
+{
+    "metadata": {
+        "title": "",
+        "description": "", 
+        "is_public": false,
+        "preprocessing_type": "lemma", 
+        "embeddings": true,
+        "embed_col": null, 
+        "language": "English",
+        "date_collected": "", 
+        "author": ""
+    },
+    "tags": [
+
+    ],
+    "text": [
+
+    ],
+    "token": ""
+}

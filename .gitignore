@@ -5,3 +5,4 @@
 *.pkl
 *.json
 *.DS_Store
+!metadata_template.json

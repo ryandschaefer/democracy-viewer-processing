@@ -57,7 +57,7 @@ def split_text(df: DataFrame):
     start = time()
         
     # Read and process stop words
-    stopwords = read_csv("python/util/stopwords.csv")
+    stopwords = read_csv("util/stopwords.csv")
     stopwords["stop_word"] = stopwords["stop_word"].str.lower().str.replace("\W", "", regex=True)
     # Stem stop words if using stemming
     if metadata["preprocessing_type"] == "stem":

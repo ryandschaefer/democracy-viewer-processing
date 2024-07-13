@@ -1,5 +1,5 @@
 # Database Interaction
-from sqlalchemy import Engine, MetaData, select, update
+from sqlalchemy import Engine, MetaData, select, update, insert
 # Update directory to import util
 from util.sqlalchemy_tables import DatasetMetadata, DatasetTextCols, Users
 
@@ -22,6 +22,17 @@ def get_metadata(engine: Engine, meta: MetaData, table_name: str) -> dict:
         record[col] = output[i]
         
     return record
+
+# Create a new metadata record
+def add_metadata(engine: Engine, params: dict) -> None:
+    query = (
+        insert(DatasetMetadata)
+            .values(**params)
+    )
+    
+    with engine.connect() as conn:
+        conn.execute(query)
+
 
 # Get the text columns of a dataset
 def get_text_cols(engine: Engine, table_name: str) -> list[str]:

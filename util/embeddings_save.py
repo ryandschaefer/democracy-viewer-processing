@@ -61,7 +61,7 @@ def compute_embeddings(df: DataFrame, metadata: dict, table_name: str, token: st
     column = metadata.get("embed_col", None)
     
     # set up stop words from github
-    stopWordFile = pd.read_csv('./python/util/stopwords.csv')# HAVE TO BE READY LOCAL
+    stopWordFile = pd.read_csv('./util/stopwords.csv')# HAVE TO BE READY LOCAL
     stopWords = set(stopWordFile['stop_word'])
 
     if column is not None:
