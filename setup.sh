@@ -1,6 +1,9 @@
 # Python dependencies
 python3 -m pip install -r requirements.txt
 
+# NLTK Moduls
+python3 -m nltk.downloader stopwords
+
 # SpaCy language models
 ### Chinese
 python3 -m spacy download zh_core_web_sm

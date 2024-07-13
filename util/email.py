@@ -4,9 +4,9 @@ from os import environ
 from util.sql_connect import sql_connect
 from util.sql_queries import get_user
 
-engine, meta = sql_connect()
-
 def send_email(template: str, params: dict, subject: str, to: str):
+    engine, meta = sql_connect()
+    
     # Set name based on provided fields
     user = get_user(engine, meta, to)
     name = "{} {}".format(user["first_name"], user["last_name"])

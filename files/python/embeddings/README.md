@@ -1,1 +1,0 @@
-This is where word embedding models will be stored until we have a location on AWS to store them.
