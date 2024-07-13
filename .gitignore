@@ -1,0 +1,7 @@
+*.history
+*.env
+*.csv
+*.parquet
+*.pkl
+*.json
+*.DS_Store
