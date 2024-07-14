@@ -1,4 +1,5 @@
 from pandas import DataFrame
+from numpy import mean
 import pickle
 from gensim.models import Word2Vec
 from pandas import DataFrame, merge
@@ -38,13 +39,21 @@ def model_similar_words(df: DataFrame, table_name: str, token: str | None = None
 def model_similar_words_over_group(df: DataFrame, group_col: str, table_name: str, token: str | None = None):
     time_values = sorted(df[group_col].unique())
     models_per_year = {}
+    times = []
 
-    for time_value in time_values:
+    for i, time_value in enumerate(time_values):
         try:
-            print("Current group:", time_value)
+            print("Group {}/{}: {}".format(i + 1, len(time_values), time_value))
+            if len(times) == 0:
+                remaining_time = "unknown"
+            else:
+                remaining_time = "{} minutes".format((mean(times) / 60) * (len(time_values) - i))
+            print("Estimated time remaining: {}".format(remaining_time))
+            start_time = time()
             cleaned_texts = prepare_text(df[df[group_col] == time_value])
             model = train_word2vec(cleaned_texts)
             models_per_year[time_value] = model
+            times.append(time() - start_time)
         except Exception:
             models_per_year[time_value] = []
             continue
