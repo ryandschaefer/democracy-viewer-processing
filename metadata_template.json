@@ -2,7 +2,7 @@
     "metadata": {
         "title": "C19 Hansard",
         "description": "", 
-        "is_public": false,
+        "is_public": true,
         "preprocessing_type": "lemma", 
         "embeddings": true,
         "embed_col": "suggested_speaker", 
