@@ -1,10 +1,11 @@
 from time import time
 start_time = time()
-from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from dotenv import load_dotenv
 from nltk.corpus import stopwords
-from pandas import DataFrame, concat, read_csv
+from numpy import array_split
+from pandas import DataFrame, concat
 from sys import argv
 from tqdm import tqdm
 tqdm.pandas()
@@ -45,6 +46,9 @@ def process_sentence(row, nlp = load_spacy_model()):
             "dep": token.dep_.lower(), "head": token.head.lemma_.lower()
         } for token in doc if not token.is_stop
     ]
+    
+def process_chunk(df: DataFrame, nlp = load_spacy_model()):
+    return concat([DataFrame(process_sentence(row, nlp)) for _, row in tqdm(df.iterrows(), total = len(df))], ignore_index=True)
 
 # Split the text of the given data frame
 def split_text(df: DataFrame):
@@ -57,8 +61,15 @@ def split_text(df: DataFrame):
         # Load spacy language
         nlp = load_spacy_model(metadata["language"])
         
+        # Multithreading
+        num_threads = 8
+        chunks = array_split(df, num_threads)
+        with ThreadPoolExecutor(max_workers=num_threads) as executor: 
+            split_data = list(executor.map(lambda x: process_chunk(x, nlp), chunks))
+        split_data = concat(split_data)
+            
         # Create new row for each word
-        split_data = concat([DataFrame(process_sentence(row, nlp)) for _, row in tqdm(split_data.iterrows())], ignore_index=True)
+        # split_data = concat([DataFrame(process_sentence(row, nlp)) for _, row in tqdm(split_data.iterrows())], ignore_index=True)
         # Remove words with unwanted pos
         split_data = split_data[~split_data["pos"].isin(["num", "part", "punct", "sym", "x", "space"])].dropna()
         # Create copy to use for embeddings

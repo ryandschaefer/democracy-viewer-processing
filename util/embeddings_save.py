@@ -15,7 +15,7 @@ def prepare_text(df: DataFrame) -> list[list[str]]:
 def train_word2vec(texts):
     model = Word2Vec(
         vector_size=100, window=5, 
-        min_count=1, workers=4
+        min_count=1, workers=8
     )
     print("Building vocabulary...")
     model.build_vocab(tqdm(texts))
