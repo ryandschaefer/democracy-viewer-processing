@@ -19,6 +19,7 @@ headers = {
     "Authorization": "Bearer {}".format(metadata["token"])
 }
 response = requests.post(BASE_URL, files = { "file": open(DATA_FILE, "rb") }, headers = headers)
+response.raise_for_status()
 
 print("Configuring dataset...")
 params = {
@@ -28,6 +29,7 @@ params = {
     "text": metadata["text"]
 }
 requests.post("{}/upload".format(BASE_URL), json = params, headers = headers)
+response.raise_for_status()
 
 print("Running processing...")
 run(["python3", "preprocessing.py", params["table_name"]])
