@@ -28,8 +28,8 @@ params = {
     "tags": metadata["tags"],
     "text": metadata["text"]
 }
-requests.post("{}/upload".format(BASE_URL), json = params, headers = headers)
-response.raise_for_status()
+response2 = requests.post("{}/upload".format(BASE_URL), json = params, headers = headers)
+response2.raise_for_status()
 
 print("Running processing...")
 run(["python3", "preprocessing.py", params["table_name"]])
