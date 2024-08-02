@@ -1,12 +1,12 @@
 {
     "metadata": {
-        "title": "C19 Hansard",
+        "title": "",
         "description": "", 
         "is_public": true,
-        "preprocessing_type": "lemma", 
-        "embeddings": true,
-        "embed_col": "suggested_speaker", 
-        "language": "English",
+        "preprocessing_type": "", 
+        "embeddings": false,
+        "embed_col": "", 
+        "language": "",
         "date_collected": "", 
         "author": ""
     },
@@ -16,5 +16,5 @@
     "text": [ "text"
 
     ],
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InNidW9uZ2lvcm5vIiwicGFzc3dvcmQiOiIkMmEkMTAkSXFXWUhNUlZlbFlRMTZpWVkzM1RWLmNDM0xWZUZkTm9FUm1yWGhxSTc4SVlPZVJBZy5kTWUiLCJlbWFpbCI6InNidW9uZ2lvcm5vQHNtdS5lZHUiLCJ0aXRsZSI6bnVsbCwiZmlyc3RfbmFtZSI6IlN0ZXBoIiwibGFzdF9uYW1lIjoiQnVvbmdpb3JubyIsInN1ZmZpeCI6bnVsbCwib3JjaWQiOm51bGwsImxpbmtlZGluX2xpbmsiOm51bGwsIndlYnNpdGUiOm51bGwsImlhdCI6MTcxOTg3MDk1MX0.dshpdgS02YxEHe6pTw42AX9KWaIRPbvAtJYkF9jpQS0"
+    "token": ""
 }
