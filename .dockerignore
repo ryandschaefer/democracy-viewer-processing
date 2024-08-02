@@ -1,0 +1,10 @@
+*.history
+*.csv
+*.parquet
+*.pkl
+*.json
+*.DS_Store
+*__pycache__
+*.ipynb
+setup.sh
+run_pipeline.py

@@ -7,6 +7,7 @@ PyJWT==2.8.0
 PyMySQL==1.1.0
 python-dotenv==1.0.1
 Requests==2.32.3
+scipy==1.11.2
 spacy==3.7.4
 SQLAlchemy==2.0.27
 tqdm==4.65.0

@@ -1,8 +1,9 @@
 from time import time
 start_time = time()
+from dotenv import load_dotenv
+load_dotenv()
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from dotenv import load_dotenv
 from nltk.corpus import stopwords
 from numpy import array_split
 from pandas import DataFrame, concat
@@ -24,7 +25,6 @@ print("Import time: {} seconds".format(time() - start_time))
 
 # Get table name from command line argument
 TABLE_NAME = argv[1]
-load_dotenv()
 
 # Get distributed token if defined
 try:
