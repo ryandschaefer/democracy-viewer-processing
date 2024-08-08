@@ -5,9 +5,10 @@ load_dotenv()
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from nltk.corpus import stopwords
-from numpy import array_split
-from pandas import DataFrame, concat
-from sys import argv
+import numpy as np
+import pandas as pd
+import polars as pl
+import sys
 from tqdm import tqdm
 tqdm.pandas()
 from util.email import send_email
@@ -24,11 +25,11 @@ from util.embeddings_save import compute_embeddings
 print("Import time: {} seconds".format(time() - start_time))
 
 # Get table name from command line argument
-TABLE_NAME = argv[1]
+TABLE_NAME = sys.argv[1]
 
 # Get distributed token if defined
 try:
-    TOKEN = argv[2]
+    TOKEN = sys.argv[2]
 except:
     TOKEN = None
 
@@ -47,11 +48,11 @@ def process_sentence(row, nlp = load_spacy_model()):
         } for token in doc if not token.is_stop
     ]
     
-def process_chunk(df: DataFrame, nlp = load_spacy_model()):
-    return concat([DataFrame(process_sentence(row, nlp)) for _, row in tqdm(df.iterrows(), total = len(df))], ignore_index=True)
+def process_chunk(df: pd.DataFrame, nlp = load_spacy_model()):
+    return pd.concat([pd.DataFrame(process_sentence(row, nlp)) for _, row in tqdm(df.iterrows(), total = len(df))], ignore_index=True)
 
 # Split the text of the given data frame
-def split_text(df: DataFrame):
+def split_text(df: pd.DataFrame):
     start = time()
     
     # Create a deep copy of data
@@ -63,13 +64,11 @@ def split_text(df: DataFrame):
         
         # Multithreading
         num_threads = 8
-        chunks = array_split(df, num_threads)
+        chunks = np.array_split(df, num_threads)
         with ThreadPoolExecutor(max_workers=num_threads) as executor: 
             split_data = list(executor.map(lambda x: process_chunk(x, nlp), chunks))
-        split_data = concat(split_data)
-            
-        # Create new row for each word
-        # split_data = concat([DataFrame(process_sentence(row, nlp)) for _, row in tqdm(split_data.iterrows())], ignore_index=True)
+        split_data = pd.concat(split_data)
+        
         # Remove words with unwanted pos
         split_data = split_data[~split_data["pos"].isin(["num", "part", "punct", "sym", "x", "space"])].dropna()
         # Create copy to use for embeddings
@@ -117,7 +116,7 @@ def split_text(df: DataFrame):
     return split_data, df_split_raw
 
 # Upload data to s3
-def upload_result(df: DataFrame):
+def upload_result(df: pd.DataFrame):
     start_time = time()
     upload(df, "tokens", TABLE_NAME, TOKEN)
     print("Upload time: {} seconds".format(time() - start_time))

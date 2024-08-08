@@ -1,6 +1,6 @@
 from email.mime.text import MIMEText
 from smtplib import SMTP_SSL
-from os import environ
+import os
 from util.sql_connect import sql_connect
 from util.sql_queries import get_user
 
@@ -32,14 +32,14 @@ def send_email(template: str, params: dict, subject: str, to: str):
         message = MIMEText(full_text, "html")
 
     # Set headers
-    from_email = environ.get("FROM_EMAIL")
+    from_email = os.environ.get("FROM_EMAIL")
     message["Subject"] = subject
     message["From"] = from_email
     message["To"] = to
     
     # Send email
-    server = SMTP_SSL(environ.get("EMAIL_SERVER"), int(environ.get("EMAIL_PORT")))
+    server = SMTP_SSL(os.environ.get("EMAIL_SERVER"), int(os.environ.get("EMAIL_PORT")))
     # server.set_debuglevel(1)
-    server.login(from_email, environ.get("EMAIL_PASSWORD"))
+    server.login(from_email, os.environ.get("EMAIL_PASSWORD"))
     server.sendmail(from_email, to, message.as_string())
     server.quit()
