@@ -1,10 +1,18 @@
 from nltk.stem.snowball import SnowballStemmer
+from nltk.tokenize import word_tokenize
 from util.spacy_models import load_spacy_model
+
+# Tokenizer
+def tokenize(text: str, language: str = "English"):
+    return word_tokenize(text, language.lower())
 
 # Stemmer
 def stem(text: str, language: str = "English"):
-    stemmer = SnowballStemmer(language = language.lower())
-    return list(map(lambda x: stemmer.stem(x), text.split()))
+    if type(text) == str:
+        stemmer = SnowballStemmer(language = language.lower())
+        return list(map(lambda x: stemmer.stem(x), text.split()))
+    else:
+        return []
 
 # Lemmatizer
 def lemmatize(text: str, language: str = "English"):

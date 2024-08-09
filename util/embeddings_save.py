@@ -9,7 +9,7 @@ import util.data_queries as data
 from util.s3 import upload_file, BASE_PATH
 
 def prepare_text(df: pd.DataFrame) -> list[list[str]]:
-    return df.groupby("id")["word"].apply(list).tolist()
+    return df.groupby("record_id")["word"].apply(list).tolist()
 
 def train_word2vec(texts):
     model = Word2Vec(
@@ -75,8 +75,8 @@ def compute_embeddings(df: pd.DataFrame, metadata: dict, table_name: str, token:
 
     if column is not None:
         # select top words over GROUP and save
-        df_text = data.get_columns(table_name, [column], token)
-        df_merged = pd.merge(df, df_text, left_on = "id", right_index = True)
+        df_text = data.get_columns(table_name, [column], token).collect().to_pandas()
+        df_merged = pd.merge(df, df_text, left_on = "record_id", right_index = True)
         model_similar_words_over_group(df_merged, column, table_name, token)
     else:
         model_similar_words(df, table_name, token)

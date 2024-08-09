@@ -2,10 +2,11 @@ import boto3
 from boto3.s3.transfer import TransferConfig
 import jwt
 import os
+import pandas as pd
 import polars as pl
 from time import time
 
-BASE_PATH = "../files/s3/{}".format(os.environ.get("DB_VERSION"))
+BASE_PATH = "files/s3/{}".format(os.environ.get("DB_VERSION"))
 
 # Use TransferConfig to optimize the download
 config = TransferConfig(
@@ -28,13 +29,16 @@ def get_creds(token: str | None = None) -> dict[str, str]:
     secret = os.environ.get("TOKEN_SECRET")
     return jwt.decode(token, secret, "HS256")
 
-def upload(df: pl.DataFrame, folder: str, name: str, token: str | None = None) -> None:
+def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, token: str | None = None) -> None:
     distributed = get_creds(token)
     
     # Convert file to parquet
     start_time = time()
     local_file = "{}/{}/{}.parquet".format(BASE_PATH, folder, name)
-    df.write_parquet(local_file, use_pyarrow=True)
+    if type(df) == pl.DataFrame:
+        df.write_parquet(local_file, use_pyarrow=True, compression="zstd")
+    elif type(df) == pd.DataFrame:
+        df.to_parquet(local_file, "pyarrow", index = False, compression = "zstd")
     print("Conversion time: {} minutes".format((time() - start_time) / 60))
     
     # Upload file to s3
