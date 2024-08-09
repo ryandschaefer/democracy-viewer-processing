@@ -8,3 +8,4 @@
 !metadata_template.json
 *__pycache__
 *.ipynb
+docker_build.sh
