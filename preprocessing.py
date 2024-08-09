@@ -25,9 +25,15 @@ print("Import time: {} seconds".format(time() - start_time))
 # Get table name from command line argument
 TABLE_NAME = sys.argv[1]
 
+# Get number of threads to use from second command line argument with default of 1 if not provided or not int
+try:
+    NUM_THREADS = int(sys.argv[2])
+except:
+    NUM_THREADS = 1
+
 # Get distributed token if defined
 try:
-    TOKEN = sys.argv[2]
+    TOKEN = sys.argv[3]
 except:
     TOKEN = None
 
@@ -93,9 +99,8 @@ def split_text(df: pd.DataFrame):
     # Create a deep copy of data
     split_data = deepcopy(df)
     # Multithreaded processing
-    num_threads = 8
-    chunks = np.array_split(df, num_threads)
-    with ThreadPoolExecutor(max_workers=num_threads) as executor: 
+    chunks = np.array_split(df, NUM_THREADS)
+    with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor: 
         split_data = list(executor.map(lambda x: process_chunk(x, metadata["preprocessing_type"]), chunks))
     split_data = pd.concat(split_data)
     # Create copy to use for embeddings
@@ -132,7 +137,7 @@ sql.complete_processing(engine, TABLE_NAME, "tokens")
 
 if metadata["embeddings"]:
     print("Processing embeddings...")
-    compute_embeddings(df_split_raw, metadata, TABLE_NAME, TOKEN)
+    compute_embeddings(df_split_raw, metadata, TABLE_NAME, NUM_THREADS, TOKEN)
     sql.complete_processing(engine, TABLE_NAME, "embeddings")
 final_time = (time() - start_time) / 60
 print("Total time: {} minutes".format(final_time))

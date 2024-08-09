@@ -11,10 +11,10 @@ from util.s3 import upload_file, BASE_PATH
 def prepare_text(df: pd.DataFrame) -> list[list[str]]:
     return df.groupby("record_id")["word"].apply(list).tolist()
 
-def train_word2vec(texts):
+def train_word2vec(texts: list[str], num_threads: int = 4):
     model = Word2Vec(
         vector_size=100, window=5, 
-        min_count=1, workers=8
+        min_count=1, workers=num_threads
     )
     print("Building vocabulary...")
     model.build_vocab(tqdm(texts))
@@ -23,9 +23,9 @@ def train_word2vec(texts):
     model.init_sims(replace=True)
     return model
 
-def model_similar_words(df: pd.DataFrame, table_name: str, token: str | None = None):
+def model_similar_words(df: pd.DataFrame, table_name: str, num_threads: int, token: str | None = None):
     cleaned_texts = prepare_text(df)
-    model = train_word2vec(cleaned_texts)
+    model = train_word2vec(cleaned_texts, num_threads)
     
     folder = "embeddings"
     name = "model_{}.pkl".format(table_name)
@@ -35,7 +35,7 @@ def model_similar_words(df: pd.DataFrame, table_name: str, token: str | None = N
         pickle.dump(model, f)
     upload_file(folder, name, token)
 
-def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name: str, token: str | None = None):
+def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name: str, num_threads: int, token: str | None = None):
     time_values = sorted(df[group_col].unique())
     models_per_year = {}
     times = []
@@ -50,7 +50,7 @@ def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name:
             print("Estimated time remaining: {}".format(remaining_time))
             start_time = time()
             cleaned_texts = prepare_text(df[df[group_col] == time_value])
-            model = train_word2vec(cleaned_texts)
+            model = train_word2vec(cleaned_texts, num_threads)
             models_per_year[time_value] = model
             times.append(time() - start_time)
         except Exception:
@@ -66,9 +66,7 @@ def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name:
         pickle.dump(models_per_year, f) 
     upload_file(folder, name, token)
 
-# NOTE: we HAVE TO ask for the users' preferrence on stopwords at the very begining when they upload the file
-# (for data cleaning purpose)
-def compute_embeddings(df: pd.DataFrame, metadata: dict, table_name: str, token: str | None = None):
+def compute_embeddings(df: pd.DataFrame, metadata: dict, table_name: str, num_threads: int, token: str | None = None):
     start = time()
     # Get grouping column if defined
     column = metadata.get("embed_col", None)
@@ -77,8 +75,8 @@ def compute_embeddings(df: pd.DataFrame, metadata: dict, table_name: str, token:
         # select top words over GROUP and save
         df_text = data.get_columns(table_name, [column], token).collect().to_pandas()
         df_merged = pd.merge(df, df_text, left_on = "record_id", right_index = True)
-        model_similar_words_over_group(df_merged, column, table_name, token)
+        model_similar_words_over_group(df_merged, column, table_name, num_threads, token)
     else:
-        model_similar_words(df, table_name, token)
+        model_similar_words(df, table_name, num_threads, token)
     print("Embeddings: {} minutes".format((time() - start) / 60))
         
