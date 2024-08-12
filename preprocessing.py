@@ -2,7 +2,8 @@ from time import time
 start_time = time()
 from dotenv import load_dotenv
 load_dotenv()
-from multiprocessing import Pool, cpu_count, freeze_support, RLock
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import RLock
 from nltk.corpus import stopwords
 import polars as pl
 import re
@@ -27,7 +28,7 @@ TABLE_NAME = sys.argv[1]
 try:
     NUM_THREADS = int(sys.argv[2])
 except:
-    NUM_THREADS = cpu_count()
+    NUM_THREADS = 1
 
 # Get distributed token if defined
 try:
@@ -81,22 +82,33 @@ def process_sentence(row, mode = "lemma"):
     
 def process_chunk(df: pl.DataFrame, mode = "lemma", i = 0) -> pl.DataFrame:
     tqdm_text = "#" + "{}".format(i + 1).zfill(2)
-    return pl.concat([process_sentence(row, mode) for row in tqdm(df.iter_rows(named = True), total = len(df), desc=tqdm_text, position=i+1)])
+    return pl.concat([process_sentence(row, mode) for row in tqdm(df.iter_rows(named = True), total = len(df), desc=tqdm_text, position=i+1, )])
 
 # Split the text of the given data frame
 def split_text(df: pl.DataFrame):
     start = time()
     
     # Multithreaded processing
-    freeze_support()
-    chunks = df.iter_slices(len(df) // NUM_THREADS)
-    pool = Pool(processes=NUM_THREADS, initargs=(RLock(),), initializer=tqdm.set_lock)
-    jobs = [pool.apply_async(process_chunk, args=(chunk, metadata["preprocessing_type"], i)) for i, chunk in enumerate(chunks)]
-    pool.close()
-    split_data_list = [job.get() for job in jobs]
+    chunks = list(df.iter_slices((len(df) // NUM_THREADS) + 1))
+    with ProcessPoolExecutor(max_workers=NUM_THREADS) as executor:
+        futures = [
+            executor.submit(process_chunk, chunk, metadata["preprocessing_type"], i)
+            for i, chunk in enumerate(chunks)
+        ]
+        
+        split_data_list: list[pl.DataFrame] = []
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                split_data_list.append(result)
+            except Exception as e:
+                print(f"Error processing chunk {future}: {e}")
     split_data = pl.concat(split_data_list)
+    # Delete lists to free memory
+    del split_data_list
+    del chunks
     # Print blank lines to adjust for progress bars
-    print("\n" * (len(jobs) + 1))
+    print("\n" * (len(futures) + 1))
     # Create copy to use for embeddings
     df_split_raw = split_data.clone()
     # Finish processing
