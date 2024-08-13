@@ -2,13 +2,11 @@ from time import time
 start_time = time()
 from dotenv import load_dotenv
 load_dotenv()
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from multiprocessing import RLock
 from nltk.corpus import stopwords
 import polars as pl
 import re
 import sys
-from tqdm import tqdm
+# from tqdm import tqdm
 from util.email import send_email
 # Database interaction
 from util.s3 import upload
@@ -79,36 +77,23 @@ def process_sentence(row, mode = "lemma"):
         })
         
     return df
-    
-def process_chunk(df: pl.DataFrame, mode = "lemma", i = 0) -> pl.DataFrame:
-    tqdm_text = "#" + "{}".format(i + 1).zfill(2)
-    return pl.concat([process_sentence(row, mode) for row in tqdm(df.iter_rows(named = True), total = len(df), desc=tqdm_text, position=i+1, )])
 
 # Split the text of the given data frame
 def split_text(df: pl.DataFrame):
     start = time()
-    
-    # Multithreaded processing
-    chunks = list(df.iter_slices((len(df) // NUM_THREADS) + 1))
-    with ProcessPoolExecutor(max_workers=NUM_THREADS) as executor:
-        futures = [
-            executor.submit(process_chunk, chunk, metadata["preprocessing_type"], i)
-            for i, chunk in enumerate(chunks)
-        ]
-        
-        split_data_list: list[pl.DataFrame] = []
-        for future in as_completed(futures):
-            try:
-                result = future.result()
-                split_data_list.append(result)
-            except Exception as e:
-                print(f"Error processing chunk {future}: {e}")
+  
+    split_data_list: list[pl.DataFrame] = []
+    for i, row in enumerate(df.iter_rows(named = True)):
+        split_data_list.append(process_sentence(row, metadata["preprocessing_type"]))
+        time_per_row = (time() - start) / (i + 1)
+        time_estimate = (len(df) - (i + 1)) * time_per_row / 60
+        print("Row {}/{}. Estimated time remaining: {} minutes".format(i + 1, len(df), time_estimate))
+    print("\n")
+    print("Merging threads...")
     split_data = pl.concat(split_data_list)
-    # Delete lists to free memory
+    # Delete list to free memory
     del split_data_list
-    del chunks
-    # Print blank lines to adjust for progress bars
-    print("\n" * (len(futures) + 1))
+    
     # Create copy to use for embeddings
     df_split_raw = split_data.clone()
     # Finish processing
