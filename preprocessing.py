@@ -2,6 +2,8 @@ from time import time
 start_time = time()
 from dotenv import load_dotenv
 load_dotenv()
+import datetime as dt
+import humanize
 from nltk.corpus import stopwords
 import polars as pl
 import re
@@ -81,15 +83,20 @@ def process_sentence(row, mode = "lemma"):
 # Split the text of the given data frame
 def split_text(df: pl.DataFrame):
     start = time()
+    prev_time = time()
   
     split_data_list: list[pl.DataFrame] = []
     for i, row in enumerate(df.iter_rows(named = True)):
         split_data_list.append(process_sentence(row, metadata["preprocessing_type"]))
-        time_per_row = (time() - start) / (i + 1)
-        time_estimate = (len(df) - (i + 1)) * time_per_row / 60
-        print("Row {}/{}. Estimated time remaining: {} minutes".format(i + 1, len(df), time_estimate))
-    print("\n")
-    print("Merging threads...")
+        curr_time = time()
+        if curr_time - prev_time > 1:
+            prev_time = curr_time
+            total_time = curr_time - start
+            its_sec = (i + 1) / total_time
+            time_left = humanize.precisedelta(dt.timedelta(seconds = (len(df) - (i + 1)) / its_sec))
+            print("Row {}/{}. {} it/sec. Estimated time remaining: {}.".format(i + 1, len(df), its_sec, time_left))
+            
+    print("Text processing complete. Merging chunks...")
     split_data = pl.concat(split_data_list)
     # Delete list to free memory
     del split_data_list
