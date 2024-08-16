@@ -1,5 +1,7 @@
 import boto3
 from boto3.s3.transfer import TransferConfig
+import datetime as dt
+import humanize
 import jwt
 import os
 import pandas as pd
@@ -39,7 +41,7 @@ def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, token: str |
         df.write_parquet(local_file, use_pyarrow=True, compression="zstd")
     elif type(df) == pd.DataFrame:
         df.to_parquet(local_file, "pyarrow", index = False, compression = "zstd")
-    print("Conversion time: {} minutes".format((time() - start_time) / 60))
+    print("Conversion time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     
     # Upload file to s3
     if "key_" in distributed.keys() and "secret" in distributed.keys():
@@ -67,7 +69,7 @@ def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, token: str |
         path,
         Config = config
     )
-    print("Upload time: {} minutes".format((time() - start_time) / 60))
+    print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     
 def upload_file(folder: str, name: str, token: str | None = None) -> None:
     distributed = get_creds(token)
@@ -99,7 +101,7 @@ def upload_file(folder: str, name: str, token: str | None = None) -> None:
         path,
         Config = config
     )
-    print("Upload time: {} minutes".format((time() - start_time) / 60))
+    print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     
 def download(folder: str, name: str, token: str | None = None) -> pl.LazyFrame:
     distributed = get_creds(token)
@@ -158,7 +160,7 @@ def download_file(folder: str, name: str, token: str | None = None) -> str:
             download_path,
             Config = config
         )
-        print("Download time: {} minutes".format((time() - start_time) / 60))
+        print("Download time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     
     return download_path
 

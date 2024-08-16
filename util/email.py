@@ -6,9 +6,10 @@ from util.sql_queries import get_user
 
 engine, meta = sql_connect()
 
-def send_email(template: str, params: dict, subject: str, to: str):
+def send_email(template: str, params: dict, subject: str, to: str, user: dict | None = None):
     # Set name based on provided fields
-    user = get_user(engine, meta, to)
+    if user is None:
+        user = get_user(engine, meta, to)
     name = "{} {}".format(user["first_name"], user["last_name"])
     title = user["title"]
     suffix = user["suffix"]
