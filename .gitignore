@@ -9,3 +9,4 @@
 *__pycache__
 *.ipynb
 docker_build.sh
+run_processing.sh

@@ -11,7 +11,7 @@ def get_text(engine: Engine, table_name: str, token: str | None = None) -> pl.La
     # Download raw data from s3
     df_raw = s3.download("datasets", table_name, token)
     # Reformat data to prep for preprocessing
-    df_list = []
+    df_list: list[pl.LazyFrame] = []
     for col in text_cols:
         df_list.append((
             df_raw

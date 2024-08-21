@@ -39,7 +39,6 @@ def model_similar_words(df: pd.DataFrame, table_name: str, num_threads: int, tok
 
 def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name: str, num_threads: int, token: str | None = None):
     time_values = sorted(df[group_col].unique())
-    models_per_year = {}
     times = []
 
     for i, time_value in enumerate(time_values):
@@ -51,24 +50,23 @@ def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name:
                 remaining_time = humanize.precisedelta(dt.timedelta(seconds = (np.mean(times)) * (len(time_values) - i)))
             print("Estimated time remaining: {}".format(remaining_time))
             start_time = time()
+            
             cleaned_texts = prepare_text(df[df[group_col] == time_value])
             model = train_word2vec(cleaned_texts, num_threads)
-            models_per_year[time_value] = model
+            
+            print("Exporting to output file...") 
+            name = "model_{}_{}.pkl".format(group_col, time_value)
+            pkl_model_file_name = "{}/{}/{}".format(BASE_PATH, "embeddings", name)
+            # save models_per_year
+            with open(pkl_model_file_name, 'wb') as f:
+                # save models as dictionary, where key is the group_col unique value AND value is the model
+                pickle.dump(model, f) 
+            print("Uploading to S3...")
+            upload_file("embeddings", "embeddings/{}".format(table_name), name, token)
+            
             times.append(time() - start_time)
         except Exception:
-            models_per_year[time_value] = []
             continue
-       
-    print("Exporting to output file...") 
-    folder = "embeddings"
-    name = "model_{}_{}.pkl".format(table_name, group_col)
-    pkl_model_file_name = "{}/{}/{}".format(BASE_PATH, folder, name)
-    # save models_per_year
-    with open(pkl_model_file_name, 'wb') as f:
-        # save models as dictionary, where key is the group_col unique value AND value is the model
-        pickle.dump(models_per_year, f) 
-    print("Uploading to S3...")
-    upload_file(folder, name, token)
 
 def compute_embeddings(df: pd.DataFrame | None, metadata: dict, table_name: str, num_threads: int, token: str | None = None):
     start = time()

@@ -165,10 +165,10 @@ def main():
         embed_time = time() - embed_time
         sql.complete_processing(engine, TABLE_NAME, "embeddings")
         # Pause to avoid timeout if upload took too long
-        if embed_time > 60:
-            print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
-            sleep(60 * 5) # 5 minutes
-            print("5 minutes done. Resuming processing")
+        # if embed_time > 5 * 60:
+        #     print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
+        #     sleep(60 * 5) # 5 minutes
+        #     print("5 minutes done. Resuming processing")
     final_time = time() - start_time
     print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
 

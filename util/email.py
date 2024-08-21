@@ -4,9 +4,9 @@ import os
 from util.sql_connect import sql_connect
 from util.sql_queries import get_user
 
-engine, meta = sql_connect()
-
 def send_email(template: str, params: dict, subject: str, to: str, user: dict | None = None):
+    engine, meta = sql_connect()
+    
     # Set name based on provided fields
     if user is None:
         user = get_user(engine, meta, to)
