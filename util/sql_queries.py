@@ -10,12 +10,16 @@ def get_metadata(engine: Engine, meta: MetaData, table_name: str) -> dict:
         select(DatasetMetadata)
             .where(DatasetMetadata.table_name == table_name)
     )
+    output = None
     with engine.connect() as conn:
         for row in conn.execute(query):
             output = row
             break
         conn.commit()
         
+    if output is None:
+        raise Exception("Query failed")    
+    
     # Give column names as keys
     record = {}
     for i, col in enumerate(meta.tables[DatasetMetadata.__tablename__].columns.keys()):

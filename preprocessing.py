@@ -1,4 +1,4 @@
-from time import time
+from time import time, sleep, tzname
 start_time = time()
 from dotenv import load_dotenv
 load_dotenv()
@@ -94,15 +94,19 @@ def split_text(df: pl.DataFrame):
             total_time = curr_time - start
             its_sec = (i + 1) / total_time
             time_left = humanize.precisedelta(dt.timedelta(seconds = (len(df) - (i + 1)) / its_sec))
-            print("Row {}/{}. {} it/sec. Estimated time remaining: {}.".format(i + 1, len(df), its_sec, time_left))
+            print("{}/{} = {}%. {} it/sec. Estimated {} remaining".format(i + 1, len(df), round(100 * (i + 1) / len(df), 2), round(its_sec, 2), time_left))
             
-    print("Text processing complete. Merging chunks...")
+    print("Text processing complete. Total time = {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
+    print("Merging results...")
     split_data = pl.concat(split_data_list)
     # Delete list to free memory
+    print("Cleaning memory...")
     del split_data_list
     
     # Create copy to use for embeddings
+    print("Creating embeddings copy...")
     df_split_raw = split_data.clone()
+    print("Finalizing tokens...")
     # Finish processing
     if metadata["preprocessing_type"] == "lemma":
         # Remove words with unwanted pos
@@ -113,7 +117,7 @@ def split_text(df: pl.DataFrame):
         # Get counts of each word in each record
         split_data = split_data.group_by(["record_id", "word", "col"]).agg(pl.len())
     
-    print("Data processing: {} minutes".format((time() - start) / 60))
+    print("Data processing: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
     return split_data, df_split_raw
 
 # Upload data to s3
@@ -126,27 +130,37 @@ def main():
     print("Loading data...") 
     load_time = time()
     df = data.get_text(engine, TABLE_NAME, TOKEN).collect()
-    print("Load time: {} minutes".format((time() - load_time) / 60))
+    print("Load time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - load_time))))
     print("Processing tokens...")   
     df_split, df_split_raw = split_text(df)
-    print("Tokens processed: {}".format(len(df)))
-    print("Uploading tokens...")
-    upload_result(df_split)
+    print("Tokens processed: {}".format(len(df_split)))
+    
+    upload_time = time()
+    upload(df_split, "tokens", TABLE_NAME, TOKEN)
+    upload_time = time() - upload_time
     sql.complete_processing(engine, TABLE_NAME, "tokens")
+    print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = upload_time))))
+    # Pause to avoid timeout if upload took too long
+    if upload_time > 60:
+        print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
+        sleep(60 * 5) # 5 minutes
+        print("5 minutes done. Resuming processing")
 
     if metadata["embeddings"]:
         print("Processing embeddings...")
+        embed_time = time()
         compute_embeddings(df_split_raw.to_pandas(), metadata, TABLE_NAME, NUM_THREADS, TOKEN)
+        embed_time = time() - embed_time
         sql.complete_processing(engine, TABLE_NAME, "embeddings")
-    final_time = (time() - start_time) / 60
-    print("Total time: {} minutes".format(final_time))
+    final_time = time() - start_time
+    print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
 
     # Get user data for email
     print("Sending confirmation email...")
     user = sql.get_user(engine, meta, metadata["email"])
     params = {
         "title": metadata["title"],
-        "time": round(final_time, 3)
+        "time": humanize.precisedelta(dt.timedelta(seconds = final_time))
     }
 
     send_email("processing_complete", params, "Processing Complete", user["email"])
