@@ -8,7 +8,7 @@ import pandas as pd
 import polars as pl
 from time import time
 
-BASE_PATH = "files/s3/{}".format(os.environ.get("DB_VERSION"))
+BASE_PATH = "files/s3"
 
 # Use TransferConfig to optimize the download
 config = TransferConfig(
@@ -23,7 +23,6 @@ def get_creds(token: str | None = None) -> dict[str, str]:
         return {
             "region": os.environ.get("S3_REGION"),
             "bucket": os.environ.get("S3_BUCKET"),
-            "dir": os.environ.get("DB_VERSION"),
             "key_": os.environ.get("S3_KEY"),
             "secret": os.environ.get("S3_SECRET")
         }
@@ -57,10 +56,7 @@ def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, token: str |
             region_name = distributed["region"]
         )
         
-    if "dir" in distributed.keys():
-        path = "{}/{}/{}.parquet".format(distributed["dir"], folder, name)
-    else:
-        path = "{}/{}.parquet".format(folder, name)
+    path = "tables/{}_{}/{}.parquet".format(folder, name, name)
         
     start_time = time()
     s3_client.upload_file(
@@ -89,10 +85,7 @@ def upload_file(local_folder: str, s3_folder: str, name: str, token: str | None 
         )
         
     local_file = "{}/{}/{}".format(BASE_PATH, local_folder, name)
-    if "dir" in distributed.keys():
-        path = "{}/{}/{}".format(distributed["dir"], s3_folder, name)
-    else:
-        path = "{}/{}".format(s3_folder, name)
+    path = "{}/{}".format(s3_folder, name)
       
     start_time = time()  
     s3_client.upload_file(
@@ -106,10 +99,7 @@ def upload_file(local_folder: str, s3_folder: str, name: str, token: str | None 
 def download(folder: str, name: str, token: str | None = None) -> pl.LazyFrame:
     distributed = get_creds(token)
     
-    if "dir" in distributed.keys():
-        path = "{}/{}/{}.parquet".format(distributed["dir"], folder, name)
-    else:
-        path = "{}/{}.parquet".format(folder, name)
+    path = "tables/{}_{}/{}.parquet".format(folder, name, name)
         
     storage_options = {
         "aws_access_key_id": distributed["key_"],
@@ -146,10 +136,7 @@ def download_file(folder: str, name: str, token: str | None = None) -> str:
                 "s3",
                 region_name = distributed["region"]
             )
-        if "dir" in distributed.keys():
-            path = "{}/{}/{}".format(distributed["dir"], folder, name)
-        else:
-            path = "{}/{}".format(folder, name)
+        path = "{}/{}".format(folder, name)
             
         start_time = time()
         s3_client.download_file(
@@ -161,39 +148,3 @@ def download_file(folder: str, name: str, token: str | None = None) -> str:
         print("Download time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     
     return download_path
-
-def delete(name: str, token: str | None = None) -> None:
-    distributed = get_creds(token)
-    
-    folders = [
-        "datasets", "embeddings", "tokens"
-    ]
-    
-    extensions = [
-        "parquet", "pkl", "parquet"
-    ]
-    
-    if "key_" in distributed.keys() and "secret" in distributed.keys():
-        s3_client = boto3.client(
-            "s3",
-            aws_access_key_id = distributed["key_"],
-            aws_secret_access_key = distributed["secret"],
-            region_name = distributed["region"]
-        )
-    else:
-        s3_client = boto3.client(
-            "s3",
-            region_name = distributed["region"]
-        )
-    
-    for i in range(len(folders)):
-        if "dir" in distributed.keys():
-            path = "{}/{}/{}.{}".format(distributed["dir"], folders[i], name, extensions[i])
-        else:
-            path = "{}/{}.{}".format(folders[i], name, extensions[i])
-            
-        s3_client.delete_object(
-            Bucket = distributed["bucket"],
-            Key = path
-        )
-            

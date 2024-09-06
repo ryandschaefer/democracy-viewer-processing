@@ -52,8 +52,9 @@ else:
 
 # Extract lemmas, pos, and dependencies from tokens
 def process_sentence(row, mode = "lemma"):
+    text = str(row["text"])
     if mode == "lemma":
-        doc = nlp(row["text"])
+        doc = nlp(text)
         df = pl.DataFrame([{
                 "record_id": row["record_id"], "col": row["col"], "word": token.lemma_.lower(), 
                 "pos": token.pos_.lower(), "tag": token.tag_.lower(), 
@@ -62,9 +63,9 @@ def process_sentence(row, mode = "lemma"):
         ])
     else:
         if mode == "stem":
-            words = wp.stem(row["text"], metadata["language"])
+            words = wp.stem(text, metadata["language"])
         else:
-            words = wp.tokenize(row["text"], metadata["language"])
+            words = wp.tokenize(text, metadata["language"])
         
         # Remove special characters
         words = [re.sub("[^A-Za-z0-9 ]+", "", word) for word in words]
@@ -87,9 +88,12 @@ def split_text(df: pl.DataFrame):
   
     split_data_list: list[pl.DataFrame] = []
     for i, row in enumerate(df.iter_rows(named = True)):
-        split_data_list.append(process_sentence(row, metadata["preprocessing_type"]))
+        df_tmp = process_sentence(row, metadata["preprocessing_type"])
+        if len(df_tmp) > 0:
+            split_data_list.append(df_tmp)
+            
         curr_time = time()
-        if curr_time - prev_time > 1:
+        if curr_time - prev_time > 5:
             prev_time = curr_time
             total_time = curr_time - start
             its_sec = (i + 1) / total_time
@@ -112,10 +116,10 @@ def split_text(df: pl.DataFrame):
         # Remove words with unwanted pos
         split_data = split_data.filter(~pl.col("pos").is_in(["num", "part", "punct", "sym", "x", "space"]))
         # Get counts of each word in each record
-        split_data = split_data.group_by(["record_id", "word", "col", "pos", "tag", "dep", "head"]).agg(pl.len())
+        split_data = split_data.group_by(["record_id", "word", "col", "pos", "tag", "dep", "head"]).agg(count = pl.len())
     else:
         # Get counts of each word in each record
-        split_data = split_data.group_by(["record_id", "word", "col"]).agg(pl.len())
+        split_data = split_data.group_by(["record_id", "word", "col"]).agg(count = pl.len())
     
     print("Data processing: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
     return split_data, df_split_raw
@@ -129,7 +133,7 @@ def upload_result(df: pl.DataFrame):
 def main():  
     print("Loading data...") 
     load_time = time()
-    df = data.get_text(engine, TABLE_NAME, TOKEN).collect()
+    df = data.get_text(engine, TABLE_NAME, TOKEN).drop_nulls().collect()
     print("Load time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - load_time))))
     print("Processing tokens...")   
     df_split, df_split_raw = split_text(df)

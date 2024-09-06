@@ -35,7 +35,7 @@ def model_similar_words(df: pd.DataFrame, table_name: str, num_threads: int, tok
     # save models_per_year
     with open(pkl_model_file_name, 'wb') as f:
         pickle.dump(model, f)
-    upload_file(folder, name, token)
+    upload_file(folder, folder, name, token)
 
 def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name: str, num_threads: int, token: str | None = None):
     time_values = sorted(df[group_col].unique())
