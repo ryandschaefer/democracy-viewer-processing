@@ -29,13 +29,14 @@ def model_similar_words(df: pd.DataFrame, table_name: str, num_threads: int, tok
     cleaned_texts = prepare_text(df)
     model = train_word2vec(cleaned_texts, num_threads)
     
-    folder = "embeddings"
-    name = "model_{}.pkl".format(table_name)
-    pkl_model_file_name = "{}/{}/{}".format(BASE_PATH, folder, name)
+    local_folder = "embeddings"
+    s3_folder = "embeddings/{}".format(table_name)
+    name = "model.pkl".format(table_name)
+    pkl_model_file_name = "{}/{}/{}".format(BASE_PATH, local_folder, name)
     # save models_per_year
     with open(pkl_model_file_name, 'wb') as f:
         pickle.dump(model, f)
-    upload_file(folder, name, token)
+    upload_file(local_folder, s3_folder, name, token)
 
 def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name: str, num_threads: int, token: str | None = None):
     time_values = sorted(df[group_col].unique())
@@ -49,11 +50,11 @@ def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name:
             else:
                 remaining_time = humanize.precisedelta(dt.timedelta(seconds = (np.mean(times)) * (len(time_values) - i)))
             print("Estimated time remaining: {}".format(remaining_time))
+            
             start_time = time()
             
             cleaned_texts = prepare_text(df[df[group_col] == time_value])
             model = train_word2vec(cleaned_texts, num_threads)
-            
             print("Exporting to output file...") 
             name = "model_{}_{}.pkl".format(group_col, time_value)
             pkl_model_file_name = "{}/{}/{}".format(BASE_PATH, "embeddings", name)
@@ -68,9 +69,8 @@ def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name:
         except Exception:
             continue
 
-def compute_embeddings(df: pd.DataFrame | None, metadata: dict, table_name: str, num_threads: int, token: str | None = None):
+def compute_embeddings(df: pd.DataFrame, metadata: dict, table_name: str, num_threads: int, token: str | None = None):
     start = time()
-    
     # Get grouping column if defined
     column = metadata.get("embed_col", None)
 
@@ -81,6 +81,6 @@ def compute_embeddings(df: pd.DataFrame | None, metadata: dict, table_name: str,
         model_similar_words_over_group(df_merged, column, table_name, num_threads, token)
     else:
         model_similar_words(df, table_name, num_threads, token)
-            
+        
     print("Embeddings: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
         
