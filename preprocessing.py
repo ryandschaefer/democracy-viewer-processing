@@ -53,8 +53,9 @@ else:
 
 # Extract lemmas, pos, and dependencies from tokens
 def process_sentence(row, mode = "lemma"):
+    text = row["text"]
     if mode == "lemma":
-        doc = nlp(row["text"])
+        doc = nlp(text)
         df = pl.DataFrame([{
                 "record_id": row["record_id"], "col": row["col"], "word": token.lemma_.lower(), 
                 "pos": token.pos_.lower(), "tag": token.tag_.lower(), 
@@ -63,14 +64,14 @@ def process_sentence(row, mode = "lemma"):
         ])
     else:
         if mode == "stem":
-            words = wp.stem(row["text"], metadata["language"])
+            words = wp.stem(text, metadata["language"])
         else:
-            words = wp.tokenize(row["text"], metadata["language"])
+            words = wp.tokenize(text, metadata["language"])
         
         # Remove special characters
         words = [re.sub("[^A-Za-z0-9 ]+", "", word) for word in words]
         # Make lowercase, remove stop words and missing data
-        words = [word.lower() for word in words if word.lower() not in stop_words and word.strip()]
+        words = [word.lower() for word in words if word.lower() not in stop_words and len(word.strip()) > 1]
         
         # Make data frame
         df = pl.DataFrame({
@@ -87,8 +88,9 @@ def process_chunk(df: pl.DataFrame, mode = "lemma", i = 0) -> pl.DataFrame:
     df_list: list[pl.DataFrame] = []
     for j, row in enumerate(df.iter_rows(named = True)):
         df2 = process_sentence(row, mode)
-        if len(df2.columns) > 0:
+        if len(df2) > 0:
             df_list.append(df2)
+            
         curr_time = time()
         if curr_time - prev_time > NUM_THREADS:
             prev_time = curr_time
@@ -112,7 +114,8 @@ def split_text(df: pl.DataFrame):
     pool.join()
     split_data_list = [job.get() for job in jobs]
             
-    print("Text processing complete. Merging chunks...")
+    print("Text processing complete. Total time = {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
+    print("Merging chunks...")
     split_data = pl.concat(split_data_list)
     # Delete list to free memory
     print("Cleaning memory...")
@@ -139,7 +142,7 @@ def split_text(df: pl.DataFrame):
 def main():  
     print("Loading data...") 
     load_time = time()
-    df = data.get_text(engine, TABLE_NAME, TOKEN).collect()
+    df = data.get_text(engine, TABLE_NAME, TOKEN).drop_nulls().collect()
     print("Load time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - load_time))))
     print("Processing tokens...")   
     df_split, df_split_raw = split_text(df)
@@ -164,11 +167,6 @@ def main():
         compute_embeddings(df_split_raw.to_pandas(), metadata, TABLE_NAME, NUM_THREADS, TOKEN)
         embed_time = time() - embed_time
         sql.complete_processing(engine, TABLE_NAME, "embeddings")
-        # Pause to avoid timeout if upload took too long
-        # if embed_time > 5 * 60:
-        #     print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
-        #     sleep(60 * 5) # 5 minutes
-        #     print("5 minutes done. Resuming processing")
     final_time = time() - start_time
     print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
 

@@ -18,6 +18,7 @@ def get_text(engine: Engine, table_name: str, token: str | None = None) -> pl.La
                 .select([col, "record_id"])
                 .rename({ f"{col}": "text" })
                 .with_columns(col=pl.lit(col))
+                .cast({ "text": pl.Utf8 })
         ))
     df = pl.concat(df_list)
     
