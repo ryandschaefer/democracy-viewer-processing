@@ -70,7 +70,7 @@ def process_sentence(row, mode = "lemma"):
         # Remove special characters
         words = [re.sub("[^A-Za-z0-9 ]+", "", word) for word in words]
         # Make lowercase, remove stop words and missing data
-        words = [word.lower() for word in words if word.lower() not in stop_words and word.strip()]
+        words = [word.lower() for word in words if word.lower() not in stop_words and len(word.strip()) > 1]
         
         # Make data frame
         df = pl.DataFrame({
@@ -142,7 +142,7 @@ def main():
     upload_time = time()
     upload(df_split, "tokens", TABLE_NAME, TOKEN)
     upload_time = time() - upload_time
-    sql.complete_processing(engine, TABLE_NAME, "tokens")
+    # sql.complete_processing(engine, TABLE_NAME, "tokens")
     print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = upload_time))))
     # Pause to avoid timeout if upload took too long
     if upload_time > 60:
