@@ -1,20 +1,11 @@
 {
-    "metadata": {
-        "title": "",
-        "description": "", 
-        "is_public": true,
-        "preprocessing_type": "", 
-        "embeddings": false,
-        "embed_col": "", 
-        "language": "",
-        "date_collected": "", 
-        "author": ""
-    },
-    "tags": [
-
-    ],
-    "text": [ "text"
-
-    ],
-    "token": ""
+    "data_file": "",
+    "preprocessing_type": "", 
+    "embeddings": false,
+    "embed_col": "", 
+    "language": "",
+    "email": "",
+    "text": [ 
+        "text"
+    ]
 }

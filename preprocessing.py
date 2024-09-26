@@ -4,49 +4,44 @@ from dotenv import load_dotenv
 load_dotenv()
 import datetime as dt
 import humanize
+import json
 from multiprocessing import Pool
 from nltk.corpus import stopwords
 import polars as pl
 import re
 import sys
 # from tqdm import tqdm
-from util.email import send_email
-# Database interaction
-from util.s3 import upload
-# SQL helpers
-from util.sql_connect import sql_connect
-import util.data_queries as data
-import util.sql_queries as sql
 # Word processing
 from util.spacy_models import load_spacy_model
 import util.word_processing as wp
 from util.embeddings_save import compute_embeddings
 
-# Get table name from command line argument
-TABLE_NAME = sys.argv[1]
+# Get parameter file name from command line argument
+PARAMS_FILE = sys.argv[1]
 
 # Get number of threads to use from second command line argument with default of 1 if not provided or not int
 try:
     NUM_THREADS = int(sys.argv[2])
 except:
     NUM_THREADS = 1
+    
+# Read metadata file
+with open(PARAMS_FILE) as f:
+    params = json.load(f)
+    
+# Get data file from parameters
+DATA_FILE = params["data_file"]
+    
+# Make dataset name
+email_formatted = re.sub(r'\W+', '_', params['email'])
+TABLE_NAME = f"{ email_formatted }_{ int(time.time() * 1000) }"
 
-# Get distributed token if defined
-try:
-    TOKEN = sys.argv[3]
-except:
-    TOKEN = None
-
-engine, meta = sql_connect()
-
-# Get metadata to determine preprocessing type
-metadata = sql.get_metadata(engine, meta, TABLE_NAME)
-
-language = metadata["language"].lower()
+# Prep stop words and spacy model
+language = params["language"].lower()
 nlp = load_spacy_model(language)
 if language in stopwords.fileids():
     stop_words = set(stopwords.words(language))
-    if metadata["preprocessing_type"] == "stem":
+    if params["preprocessing_type"] == "stem":
         stop_words = list(map(lambda x: wp.stem(x, language), stop_words))
 else:
     stop_words = []
@@ -64,9 +59,9 @@ def process_sentence(row, mode = "lemma"):
         ])
     else:
         if mode == "stem":
-            words = wp.stem(text, metadata["language"])
+            words = wp.stem(text, params["language"])
         else:
-            words = wp.tokenize(text, metadata["language"])
+            words = wp.tokenize(text, params["language"])
         
         # Remove special characters
         words = [re.sub("[^A-Za-z0-9 ]+", "", word) for word in words]
@@ -109,7 +104,7 @@ def split_text(df: pl.DataFrame):
     # Multithread processing
     chunks = df.iter_slices(len(df) // NUM_THREADS + 1)
     pool = Pool(processes=NUM_THREADS)
-    jobs = [pool.apply_async(process_chunk, args=(chunk, metadata["preprocessing_type"], i)) for i, chunk in enumerate(chunks)]
+    jobs = [pool.apply_async(process_chunk, args=(chunk, params["preprocessing_type"], i)) for i, chunk in enumerate(chunks)]
     pool.close()
     pool.join()
     split_data_list = [job.get() for job in jobs]
@@ -127,7 +122,7 @@ def split_text(df: pl.DataFrame):
     df_split_raw = split_data.clone()
     print("Finalizing tokens...")
     # Finish processing
-    if metadata["preprocessing_type"] == "lemma":
+    if params["preprocessing_type"] == "lemma":
         # Remove words with unwanted pos
         split_data = split_data.filter(~pl.col("pos").is_in(["num", "part", "punct", "sym", "x", "space"]))
         # Get counts of each word in each record
@@ -142,44 +137,35 @@ def split_text(df: pl.DataFrame):
 def main():  
     print("Loading data...") 
     load_time = time()
-    df = data.get_text(engine, TABLE_NAME, TOKEN).drop_nulls().collect()
+    df_raw = pl.read_csv(DATA_FILE).with_row_index("record_id")
+    df_list: list[pl.DataFrame] = []
+    for col in params["text"]:
+        df_list.append(
+            df_raw
+                .select([col, "record_id"])
+                .rename({ f"{col}": "text" })
+                .with_columns(col=pl.lit(col))
+                .cast({ "text": pl.Utf8 })
+        )
+    df = pl.concat(df_list).drop_nulls()
+    
     print("Load time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - load_time))))
     print("Processing tokens...")   
     df_split, df_split_raw = split_text(df)
     print("Tokens processed: {}".format(len(df_split)))
-    print("Uploading tokens...")
-    upload_time = time()
-    upload(df_split, "tokens", TABLE_NAME, TOKEN)
-    upload_time = time() - upload_time
+    df_split.write_parquet(f"files/output/{ TABLE_NAME }_split.parquet", use_pyarrow=True, compression="zstd")
     # sql.complete_processing(engine, TABLE_NAME, "tokens")
-    
-    # Pause to avoid timeout if upload took too long
-    if upload_time > 60:
-        print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
-        sleep(60 * 5) # 5 minutes
-        print("5 minutes done. Resuming processing")
 
-    if metadata["embeddings"]:
+    if params["embeddings"]:
         # Save data frame to output file in case of crash
         df_split_raw.write_parquet("{}_split_raw.parquet".format(TABLE_NAME), use_pyarrow=True, compression="zstd")
         print("Processing embeddings...")
         embed_time = time()
-        compute_embeddings(df_split_raw.to_pandas(), metadata, TABLE_NAME, NUM_THREADS, TOKEN)
+        compute_embeddings(df_split_raw.to_pandas(), params, NUM_THREADS)
         embed_time = time() - embed_time
-        sql.complete_processing(engine, TABLE_NAME, "embeddings")
+        # sql.complete_processing(engine, TABLE_NAME, "embeddings")
     final_time = time() - start_time
     print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
-
-    # Get user data for email
-    print("Sending confirmation email...")
-    user = sql.get_user(engine, meta, metadata["email"])
-    params = {
-        "title": metadata["title"],
-        "time": humanize.precisedelta(dt.timedelta(seconds = final_time))
-    }
-
-    send_email("processing_complete", params, "Processing Complete", user["email"])
-    print("Email sent to", user["email"])
     
 if __name__ == "__main__":
     main()

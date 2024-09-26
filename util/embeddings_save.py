@@ -6,9 +6,6 @@ import humanize
 import pandas as pd
 from time import time
 from tqdm import tqdm
-# Database interaction
-import util.data_queries as data
-from util.s3 import upload_file, BASE_PATH
 
 def prepare_text(df: pd.DataFrame) -> list[list[str]]:
     return df.groupby("record_id")["word"].apply(list).tolist()
@@ -25,20 +22,17 @@ def train_word2vec(texts: list[str], num_threads: int = 4):
     model.init_sims(replace=True)
     return model
 
-def model_similar_words(df: pd.DataFrame, table_name: str, num_threads: int, token: str | None = None):
+def model_similar_words(df: pd.DataFrame, num_threads: int):
     cleaned_texts = prepare_text(df)
     model = train_word2vec(cleaned_texts, num_threads)
     
-    local_folder = "embeddings"
-    s3_folder = "embeddings/{}".format(table_name)
-    name = "model.pkl".format(table_name)
-    pkl_model_file_name = "{}/{}/{}".format(BASE_PATH, local_folder, name)
+    name = "model.pkl"
+    pkl_model_file_name = "files/output/embeddings/{}".format(name)
     # save models_per_year
     with open(pkl_model_file_name, 'wb') as f:
         pickle.dump(model, f)
-    upload_file(local_folder, s3_folder, name, token)
 
-def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name: str, num_threads: int, token: str | None = None):
+def model_similar_words_over_group(df: pd.DataFrame, group_col: str, num_threads: int):
     time_values = sorted(df[group_col].unique())
     times = []
 
@@ -57,30 +51,29 @@ def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name:
             model = train_word2vec(cleaned_texts, num_threads)
             print("Exporting to output file...") 
             name = "model_{}_{}.pkl".format(group_col, time_value)
-            pkl_model_file_name = "{}/{}/{}".format(BASE_PATH, "embeddings", name)
+            pkl_model_file_name = "files/output/embeddings/{}".format(name)
             # save models_per_year
             with open(pkl_model_file_name, 'wb') as f:
                 # save models as dictionary, where key is the group_col unique value AND value is the model
                 pickle.dump(model, f) 
             print("Uploading to S3...")
-            upload_file("embeddings", "embeddings/{}".format(table_name), name, token)
             
             times.append(time() - start_time)
         except Exception:
             continue
 
-def compute_embeddings(df: pd.DataFrame, metadata: dict, table_name: str, num_threads: int, token: str | None = None):
+def compute_embeddings(df: pd.DataFrame, metadata: dict, num_threads: int):
     start = time()
     # Get grouping column if defined
     column = metadata.get("embed_col", None)
 
     if column is not None:
         # select top words over GROUP and save
-        df_text = data.get_columns(table_name, [column], token).collect().to_pandas()
+        df_text = pd.read_parquet(metadata["data_file"], "pyarrow")[[column]]
         df_merged = pd.merge(df, df_text, left_on = "record_id", right_index = True)
-        model_similar_words_over_group(df_merged, column, table_name, num_threads, token)
+        model_similar_words_over_group(df_merged, column, num_threads)
     else:
-        model_similar_words(df, table_name, num_threads, token)
+        model_similar_words(df, num_threads)
         
     print("Embeddings: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
         
