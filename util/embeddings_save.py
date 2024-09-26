@@ -1,6 +1,7 @@
 import datetime as dt
 import numpy as np
 import pickle
+import os
 from gensim.models import Word2Vec
 import humanize
 import pandas as pd
@@ -22,17 +23,17 @@ def train_word2vec(texts: list[str], num_threads: int = 4):
     model.init_sims(replace=True)
     return model
 
-def model_similar_words(df: pd.DataFrame, num_threads: int):
+def model_similar_words(df: pd.DataFrame, num_threads: int, output_path: str):
     cleaned_texts = prepare_text(df)
     model = train_word2vec(cleaned_texts, num_threads)
     
     name = "model.pkl"
-    pkl_model_file_name = "files/output/embeddings/{}".format(name)
+    pkl_model_file_name = "{}/{}".format(output_path, name)
     # save models_per_year
     with open(pkl_model_file_name, 'wb') as f:
         pickle.dump(model, f)
 
-def model_similar_words_over_group(df: pd.DataFrame, group_col: str, num_threads: int):
+def model_similar_words_over_group(df: pd.DataFrame, group_col: str, num_threads: int, output_path: str):
     time_values = sorted(df[group_col].unique())
     times = []
 
@@ -51,7 +52,7 @@ def model_similar_words_over_group(df: pd.DataFrame, group_col: str, num_threads
             model = train_word2vec(cleaned_texts, num_threads)
             print("Exporting to output file...") 
             name = "model_{}_{}.pkl".format(group_col, time_value)
-            pkl_model_file_name = "files/output/embeddings/{}".format(name)
+            pkl_model_file_name = "{}/{}".format(output_path, name)
             # save models_per_year
             with open(pkl_model_file_name, 'wb') as f:
                 # save models as dictionary, where key is the group_col unique value AND value is the model
@@ -62,18 +63,18 @@ def model_similar_words_over_group(df: pd.DataFrame, group_col: str, num_threads
         except Exception:
             continue
 
-def compute_embeddings(df: pd.DataFrame, metadata: dict, num_threads: int):
+def compute_embeddings(df: pd.DataFrame, metadata: dict, num_threads: int, output_path: str):
     start = time()
     # Get grouping column if defined
     column = metadata.get("embed_col", None)
 
     if column is not None:
         # select top words over GROUP and save
-        df_text = pd.read_csv(metadata["data_file"], "pyarrow")[[column]]
+        df_text = pd.read_csv(metadata["data_file"])[[column]]
         df_merged = pd.merge(df, df_text, left_on = "record_id", right_index = True)
-        model_similar_words_over_group(df_merged, column, num_threads)
+        model_similar_words_over_group(df_merged, column, num_threads, output_path)
     else:
-        model_similar_words(df, num_threads)
+        model_similar_words(df, num_threads, output_path)
         
     print("Embeddings: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
         

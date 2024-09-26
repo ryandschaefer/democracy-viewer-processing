@@ -1,4 +1,4 @@
-from time import time, sleep, tzname
+from time import time
 start_time = time()
 from dotenv import load_dotenv
 load_dotenv()
@@ -7,6 +7,7 @@ import humanize
 import json
 from multiprocessing import Pool
 from nltk.corpus import stopwords
+import os
 import polars as pl
 import re
 import sys
@@ -34,7 +35,7 @@ DATA_FILE = params["data_file"]
     
 # Make dataset name
 email_formatted = re.sub(r'\W+', '_', params['email'])
-TABLE_NAME = f"{ email_formatted }_{ int(time.time() * 1000) }"
+TABLE_NAME = f"{ email_formatted }_{ int(time() * 1000) }"
 
 # Prep stop words and spacy model
 language = params["language"].lower()
@@ -135,6 +136,10 @@ def split_text(df: pl.DataFrame):
     return split_data, df_split_raw
        
 def main():  
+    # Create new folder to store output
+    output_path = f"files/{ TABLE_NAME }"
+    os.makedirs(f"{ output_path }/embeddings")
+    
     print("Loading data...") 
     load_time = time()
     df_raw = pl.read_csv(DATA_FILE).with_row_index("record_id")
@@ -148,20 +153,21 @@ def main():
                 .cast({ "text": pl.Utf8 })
         )
     df = pl.concat(df_list).drop_nulls()
+    del df_list
     
     print("Load time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - load_time))))
     print("Processing tokens...")   
     df_split, df_split_raw = split_text(df)
     print("Tokens processed: {}".format(len(df_split)))
-    df_split.write_parquet(f"files/output/{ TABLE_NAME }_split.parquet", use_pyarrow=True, compression="zstd")
+    df_split.write_parquet(f"{ output_path }/{ TABLE_NAME }_split.parquet", use_pyarrow=True, compression="zstd")
     # sql.complete_processing(engine, TABLE_NAME, "tokens")
 
     if params["embeddings"]:
         # Save data frame to output file in case of crash
-        df_split_raw.write_parquet("{}_split_raw.parquet".format(TABLE_NAME), use_pyarrow=True, compression="zstd")
+        # df_split_raw.write_parquet("{}_split_raw.parquet".format(TABLE_NAME), use_pyarrow=True, compression="zstd")
         print("Processing embeddings...")
         embed_time = time()
-        compute_embeddings(df_split_raw.to_pandas(), params, NUM_THREADS)
+        compute_embeddings(df_split_raw.to_pandas(), params, NUM_THREADS, f"{ output_path }/embeddings")
         embed_time = time() - embed_time
         # sql.complete_processing(engine, TABLE_NAME, "embeddings")
     final_time = time() - start_time

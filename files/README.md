@@ -1,1 +1,1 @@
-This is where files will temporarily be stored after retrieving them from S3.
+This is where the output of the processing pipeline will go.
