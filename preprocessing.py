@@ -57,11 +57,13 @@ def process_sentence(row, mode = "lemma"):
     if mode == "lemma":
         doc = nlp(text)
         df = pl.DataFrame([{
-                "record_id": row["record_id"], "col": row["col"], "word": token.lemma_.lower(), 
+                "record_id": row["record_id"], "col": row["col"], "word": re.sub("[^A-Za-z0-9 ]+", "", token.lemma_.lower()), 
                 "pos": token.pos_.lower(), "tag": token.tag_.lower(), 
                 "dep": token.dep_.lower(), "head": token.head.lemma_.lower()
             } for token in doc if not token.is_stop
         ])
+        # Remove 1 character words
+        df = df.filter(pl.col("word").str.strip_chars().str.len_chars() > 1)
     else:
         if mode == "stem":
             words = wp.stem(text, metadata["language"])
