@@ -69,7 +69,7 @@ def compute_embeddings(df: pd.DataFrame, metadata: dict, num_threads: int):
 
     if column is not None:
         # select top words over GROUP and save
-        df_text = pd.read_parquet(metadata["data_file"], "pyarrow")[[column]]
+        df_text = pd.read_csv(metadata["data_file"], "pyarrow")[[column]]
         df_merged = pd.merge(df, df_text, left_on = "record_id", right_index = True)
         model_similar_words_over_group(df_merged, column, num_threads)
     else:
