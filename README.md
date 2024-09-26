@@ -1,5 +1,11 @@
 # Democracy Viewer Processing
 
+To use the "No AWS" version of this repository, use the following command to clone the correct branch.
+
+```bash
+git clone --single-branch --branch no-aws https://github.com/ryandschaefer/democracy-viewer-processing.git
+```
+
 ## Instructions to Run
 
 ### 1. Install Dependencies (First Time Only)
