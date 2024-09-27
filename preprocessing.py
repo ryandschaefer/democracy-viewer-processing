@@ -8,8 +8,6 @@ from nltk.corpus import stopwords
 import polars as pl
 import re
 import sys
-# from tqdm import tqdm
-from util.email import send_email
 # Database interaction
 from util.s3 import upload
 # SQL helpers
@@ -168,17 +166,6 @@ def main():
         sql.complete_processing(engine, TABLE_NAME, "embeddings")
     final_time = time() - start_time
     print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
-
-    # Get user data for email
-    print("Sending confirmation email...")
-    user = sql.get_user(engine, meta, metadata["email"])
-    params = {
-        "title": metadata["title"],
-        "time": humanize.precisedelta(dt.timedelta(seconds = final_time))
-    }
-
-    send_email("processing_complete", params, "Processing Complete", user["email"])
-    print("Email sent to", user["email"])
     
 if __name__ == "__main__":
     main()
