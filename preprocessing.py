@@ -61,6 +61,14 @@ def process_sentence(row, mode = "lemma"):
                 "dep": token.dep_.lower(), "head": token.head.lemma_.lower()
             } for token in doc if not token.is_stop
         ])
+        
+        # Return empty data frame if empty
+        if len(df) == 0:
+            return pl.DataFrame(schema = [
+                "record_id", "col", "word",
+                "pos", "tag", "dep", "head"
+            ])
+            
         # Remove 1 character words
         df = df.filter(pl.col("word").str.strip_chars().str.len_chars() > 1)
     else:
