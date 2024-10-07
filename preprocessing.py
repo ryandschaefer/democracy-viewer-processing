@@ -150,7 +150,6 @@ def main():
     upload_time = time()
     upload(df_split, "tokens", TABLE_NAME, TOKEN)
     upload_time = time() - upload_time
-    # sql.complete_processing(engine, TABLE_NAME, "tokens")
     print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = upload_time))))
     # Pause to avoid timeout if upload took too long
     if upload_time > 60:
