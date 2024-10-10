@@ -23,7 +23,8 @@ def get_metadata(engine: Engine, meta: MetaData, table_name: str) -> dict:
     # Give column names as keys
     record = {}
     for i, col in enumerate(meta.tables[DatasetMetadata.__tablename__].columns.keys()):
-        record[col] = output[i]
+        if i < len(output):
+            record[col] = output[i]
         
     return record
 
@@ -36,7 +37,6 @@ def add_metadata(engine: Engine, params: dict) -> None:
     
     with engine.connect() as conn:
         conn.execute(query)
-
 
 # Get the text columns of a dataset
 def get_text_cols(engine: Engine, table_name: str) -> list[str]:
@@ -68,23 +68,4 @@ def complete_processing(engine: Engine, table_name: str, processing_type: str) -
     with engine.connect() as conn:
         conn.execute(query)
         conn.commit()
-
-# Get a user record by email
-def get_user(engine: Engine, meta: MetaData, email: str) -> dict:
-    # Make query
-    query = (
-        select(Users)
-            .where(Users.email == email)
-    )
-    with engine.connect() as conn:
-        for row in conn.execute(query):
-            output = row
-            break
-        conn.commit()
-        
-    # Give column names as keys
-    record = {}
-    for i, col in enumerate(meta.tables[Users.__tablename__].columns.keys()):
-        record[col] = output[i]
-        
-    return record
+    

@@ -57,7 +57,7 @@ else:
 
 # Extract lemmas, pos, and dependencies from tokens
 def process_sentence(row, mode = "lemma"):
-    text = row["text"]
+    text = str(row["text"])
     if mode == "lemma":
         doc = nlp(text)
         df = pl.DataFrame([{
