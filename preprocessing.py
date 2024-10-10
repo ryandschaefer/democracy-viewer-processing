@@ -3,9 +3,10 @@ start_time = time()
 from dotenv import load_dotenv
 load_dotenv()
 import datetime as dt
+from functools import partial
 import humanize
 import json
-from multiprocessing import Pool
+import multiprocessing as mp
 from nltk.corpus import stopwords
 import os
 import polars as pl
@@ -81,9 +82,10 @@ def process_sentence(row, mode = "lemma"):
     return df
 
 def process_chunk(df: pl.DataFrame, mode = "lemma", i = 0) -> pl.DataFrame:
+    df_list: list[pl.DataFrame] = []
+    
     start_time = time()
     prev_time = start_time
-    df_list: list[pl.DataFrame] = []
     for j, row in enumerate(df.iter_rows(named = True)):
         df2 = process_sentence(row, mode)
         if len(df2) > 0:
@@ -100,17 +102,21 @@ def process_chunk(df: pl.DataFrame, mode = "lemma", i = 0) -> pl.DataFrame:
             print("Thread #{}: Done. Total time = {}".format("{}".format(i+1).zfill(2), humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     return pl.concat(df_list)
 
+def process_thread(arg: tuple[int, pl.DataFrame], mode = "lemma") -> pl.DataFrame:
+    i, df = arg
+    return process_chunk(df, mode, i)
+
 # Split the text of the given data frame
 def split_text(df: pl.DataFrame):
     start = time()
   
     # Multithread processing
-    chunks = df.iter_slices(len(df) // NUM_THREADS + 1)
-    pool = Pool(processes=NUM_THREADS)
-    jobs = [pool.apply_async(process_chunk, args=(chunk, params["preprocessing_type"], i)) for i, chunk in enumerate(chunks)]
-    pool.close()
-    pool.join()
-    split_data_list = [job.get() for job in jobs]
+    chunks = list(enumerate(df.iter_slices(len(df) // NUM_THREADS + 1)))
+    parallel_function = partial(process_thread, mode=params["preprocessing_type"])
+    with mp.get_context("spawn").Pool(NUM_THREADS) as pool:
+        results = pool.map(parallel_function, chunks, 1)
+        pool.terminate()
+    split_data_list = [result for result in results]
             
     print("Text processing complete. Total time = {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
     print("Merging chunks...")
