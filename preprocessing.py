@@ -106,11 +106,14 @@ def split_text(df: pl.DataFrame):
   
     # Multithread processing
     chunks = df.iter_slices(len(df) // NUM_THREADS + 1)
-    pool = Pool(processes=NUM_THREADS)
-    jobs = [pool.apply_async(process_chunk, args=(chunk, params["preprocessing_type"], i)) for i, chunk in enumerate(chunks)]
-    pool.close()
-    pool.join()
-    split_data_list = [job.get() for job in jobs]
+    # pool = Pool(processes=NUM_THREADS)
+    # jobs = [pool.apply_async(process_chunk, args=(chunk, params["preprocessing_type"], i)) for i, chunk in enumerate(chunks)]
+    # pool.close()
+    # pool.join()
+    # split_data_list = [job.get() for job in jobs]
+    split_data_list = []
+    for i, chunk in enumerate(chunks):
+        split_data_list.append(process_chunk(chunk, params["preporcessing_type"], i))
             
     print("Text processing complete. Total time = {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
     print("Merging chunks...")
