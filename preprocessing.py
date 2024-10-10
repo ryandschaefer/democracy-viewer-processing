@@ -5,15 +5,13 @@ load_dotenv()
 import datetime as dt
 from functools import partial
 import humanize
-import json
 import multiprocessing as mp
 from nltk.corpus import stopwords
-import os
 import polars as pl
 import re
 import sys
 # from tqdm import tqdm
-from util.email import send_email
+# from util.email import send_email
 # Database interaction
 from util.s3 import upload
 # SQL helpers

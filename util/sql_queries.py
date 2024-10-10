@@ -69,3 +69,22 @@ def complete_processing(engine: Engine, table_name: str, processing_type: str) -
         conn.execute(query)
         conn.commit()
     
+# Get a user record by email
+def get_user(engine: Engine, meta: MetaData, email: str) -> dict:
+    # Make query
+    query = (
+        select(Users)
+            .where(Users.email == email)
+    )
+    with engine.connect() as conn:
+        for row in conn.execute(query):
+            output = row
+            break
+        conn.commit()
+        
+    # Give column names as keys
+    record = {}
+    for i, col in enumerate(meta.tables[Users.__tablename__].columns.keys()):
+        record[col] = output[i]
+        
+    return record
