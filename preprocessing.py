@@ -113,7 +113,7 @@ def split_text(df: pl.DataFrame):
     # split_data_list = [job.get() for job in jobs]
     split_data_list = []
     for i, chunk in enumerate(chunks):
-        split_data_list.append(process_chunk(chunk, params["preporcessing_type"], i))
+        split_data_list.append(process_chunk(chunk, params["preprocessing_type"], i))
             
     print("Text processing complete. Total time = {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
     print("Merging chunks...")
