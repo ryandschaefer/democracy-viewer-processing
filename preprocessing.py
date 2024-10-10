@@ -3,9 +3,12 @@ start_time = time()
 from dotenv import load_dotenv
 load_dotenv()
 import datetime as dt
+from functools import partial
 import humanize
-from multiprocessing import Pool
+import json
+import multiprocessing as mp
 from nltk.corpus import stopwords
+import os
 import polars as pl
 import re
 import sys
@@ -42,6 +45,7 @@ engine, meta = sql_connect()
 # Get metadata to determine preprocessing type
 metadata = sql.get_metadata(engine, meta, TABLE_NAME)
 
+# Prep stop words and spacy model
 language = metadata["language"].lower()
 nlp = load_spacy_model(language)
 if language in stopwords.fileids():
@@ -62,6 +66,14 @@ def process_sentence(row, mode = "lemma"):
                 "dep": token.dep_.lower(), "head": token.head.lemma_.lower()
             } for token in doc if not token.is_stop
         ])
+        
+        # Return empty data frame if empty
+        if len(df) == 0:
+            return pl.DataFrame(schema = [
+                "record_id", "col", "word",
+                "pos", "tag", "dep", "head"
+            ])
+
         # Remove 1 character words
         df = df.filter(pl.col("word").str.strip_chars().str.len_chars() > 1)
     else:
@@ -85,9 +97,10 @@ def process_sentence(row, mode = "lemma"):
     return df
 
 def process_chunk(df: pl.DataFrame, mode = "lemma", i = 0) -> pl.DataFrame:
+    df_list: list[pl.DataFrame] = []
+    
     start_time = time()
     prev_time = start_time
-    df_list: list[pl.DataFrame] = []
     for j, row in enumerate(df.iter_rows(named = True)):
         df2 = process_sentence(row, mode)
         if len(df2) > 0:
@@ -104,17 +117,21 @@ def process_chunk(df: pl.DataFrame, mode = "lemma", i = 0) -> pl.DataFrame:
             print("Thread #{}: Done. Total time = {}".format("{}".format(i+1).zfill(2), humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     return pl.concat(df_list)
 
+def process_thread(arg: tuple[int, pl.DataFrame], mode = "lemma") -> pl.DataFrame:
+    i, df = arg
+    return process_chunk(df, mode, i)
+
 # Split the text of the given data frame
 def split_text(df: pl.DataFrame):
     start = time()
   
     # Multithread processing
-    chunks = df.iter_slices(len(df) // NUM_THREADS + 1)
-    pool = Pool(processes=NUM_THREADS)
-    jobs = [pool.apply_async(process_chunk, args=(chunk, metadata["preprocessing_type"], i)) for i, chunk in enumerate(chunks)]
-    pool.close()
-    pool.join()
-    split_data_list = [job.get() for job in jobs]
+    chunks = list(enumerate(df.iter_slices(len(df) // NUM_THREADS + 1)))
+    parallel_function = partial(process_thread, mode=metadata["preprocessing_type"])
+    with mp.get_context("spawn").Pool(NUM_THREADS) as pool:
+        results = pool.map(parallel_function, chunks, 1)
+        pool.terminate()
+    split_data_list = [result for result in results]
             
     print("Text processing complete. Total time = {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
     print("Merging chunks...")
@@ -154,16 +171,18 @@ def main():
     upload(df_split, "tokens", TABLE_NAME, TOKEN)
     upload_time = time() - upload_time
     # sql.complete_processing(engine, TABLE_NAME, "tokens")
-    
-    # Pause to avoid timeout if upload took too long
-    if upload_time > 60:
-        print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
-        sleep(60 * 5) # 5 minutes
-        print("5 minutes done. Resuming processing")
 
     if metadata["embeddings"]:
         # Save data frame to output file in case of crash
-        df_split_raw.write_parquet("{}_split_raw.parquet".format(TABLE_NAME), use_pyarrow=True, compression="zstd")
+        # df_split_raw.write_parquet("{}_split_raw.parquet".format(TABLE_NAME), use_pyarrow=True, compression="zstd")
+        
+        # Pause to avoid timeout if upload took too long
+        if upload_time > 60:
+            print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
+            sleep(60 * 5) # 5 minutes
+            print("5 minutes done. Resuming processing")
+            
+        # Run embeddings
         print("Processing embeddings...")
         embed_time = time()
         compute_embeddings(df_split_raw.to_pandas(), metadata, TABLE_NAME, NUM_THREADS, TOKEN)
@@ -173,15 +192,15 @@ def main():
     print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
 
     # Get user data for email
-    print("Sending confirmation email...")
-    user = sql.get_user(engine, meta, metadata["email"])
-    params = {
-        "title": metadata["title"],
-        "time": humanize.precisedelta(dt.timedelta(seconds = final_time))
-    }
+    # print("Sending confirmation email...")
+    # user = sql.get_user(engine, meta, metadata["email"])
+    # params = {
+    #     "title": metadata["title"],
+    #     "time": humanize.precisedelta(dt.timedelta(seconds = final_time))
+    # }
 
-    send_email("processing_complete", params, "Processing Complete", user["email"])
-    print("Email sent to", user["email"])
+    # send_email("processing_complete", params, "Processing Complete", user["email"])
+    # print("Email sent to", user["email"])
     
 if __name__ == "__main__":
     main()
