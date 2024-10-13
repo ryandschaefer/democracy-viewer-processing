@@ -34,7 +34,7 @@ def model_similar_words(df: pd.DataFrame, num_threads: int, output_path: str):
         pickle.dump(model, f)
 
 def model_similar_words_over_group(df: pd.DataFrame, group_col: str, num_threads: int, output_path: str):
-    time_values = sorted(df[group_col].unique())
+    time_values = sorted(df[group_col].astype(str).unique())
     times = []
 
     for i, time_value in enumerate(time_values):
