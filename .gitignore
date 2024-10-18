@@ -4,6 +4,7 @@
 *.parquet
 *.pkl
 *.json
+*.txt
 *.DS_Store
 !metadata_template.json
 *__pycache__

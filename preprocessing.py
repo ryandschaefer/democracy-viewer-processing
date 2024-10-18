@@ -13,7 +13,7 @@ import sys
 # from tqdm import tqdm
 # from util.email import send_email
 # Database interaction
-from util.s3 import upload
+import util.s3 as s3
 # SQL helpers
 from util.sql_connect import sql_connect
 import util.data_queries as data
@@ -43,15 +43,50 @@ engine, meta = sql_connect()
 # Get metadata to determine preprocessing type
 metadata = sql.get_metadata(engine, meta, TABLE_NAME)
 
+# Load stopwords file if it exists
+try:
+    s3.download_file(f"files/{ TABLE_NAME }.txt", "stopwords", f"{ TABLE_NAME }.txt", TOKEN)
+    custom_stopwords = True
+except:
+    custom_stopwords = False
+
 # Prep stop words and spacy model
 language = metadata["language"].lower()
 nlp = load_spacy_model(language)
-if language in stopwords.fileids():
-    stop_words = set(stopwords.words(language))
-    if metadata["preprocessing_type"] == "stem":
-        stop_words = list(map(lambda x: wp.stem(x, language), stop_words))
+if custom_stopwords:
+    with open(f"files/{ TABLE_NAME }.txt") as f:
+        stop_words = f.readlines()
 else:
-    stop_words = []
+    if language in stopwords.fileids():
+        stop_words = list(set(stopwords.words(language)))
+    else:
+        stop_words = []
+        
+if metadata["preprocessing_type"] == "stem":
+    stop_words2: list[str] = []
+    for word in stop_words:
+        for token in wp.stem(word, language):
+            tmp = re.sub("[^A-Za-z0-9 ]+", "", token).strip()
+            if len(tmp) > 1:
+                stop_words2.append(tmp)
+    stop_words = stop_words2
+elif metadata["preprocessing_type"] == "lemma":
+    stop_words2: list[str] = []
+    for word in stop_words:
+        doc = nlp(word)
+        for token in doc:
+            tmp = re.sub("[^A-Za-z0-9 ]+", "", token.lemma_).strip()
+            if len(tmp) > 1:
+                stop_words2.append(tmp)
+    stop_words = stop_words2
+else:
+    stop_words2: list[str] = []
+    for word in stop_words:
+        for token in wp.tokenize(word, language):
+            tmp = re.sub("[^A-Za-z0-9 ]+", "", token).strip()
+            if len(tmp) > 1:
+                stop_words2.append(tmp)
+    stop_words = stop_words2
 
 # Extract lemmas, pos, and dependencies from tokens
 def process_sentence(row, mode = "lemma"):
@@ -62,7 +97,7 @@ def process_sentence(row, mode = "lemma"):
                 "record_id": row["record_id"], "col": row["col"], "word": re.sub("[^A-Za-z0-9 ]+", "", token.lemma_.lower()), 
                 "pos": token.pos_.lower(), "tag": token.tag_.lower(), 
                 "dep": token.dep_.lower(), "head": token.head.lemma_.lower()
-            } for token in doc if not token.is_stop
+            } for token in doc if token.lemma_ not in stop_words
         ])
         
         # Return empty data frame if empty
@@ -81,9 +116,9 @@ def process_sentence(row, mode = "lemma"):
             words = wp.tokenize(text, metadata["language"])
         
         # Remove special characters
-        words = [re.sub("[^A-Za-z0-9 ]+", "", word) for word in words]
+        words = [re.sub("[^A-Za-z0-9 ]+", "", word).strip() for word in words]
         # Make lowercase, remove stop words and missing data
-        words = [word.lower() for word in words if word.lower() not in stop_words and len(word.strip()) > 1]
+        words = [word.lower() for word in words if word.lower() not in stop_words and len(word) > 1]
         
         # Make data frame
         df = pl.DataFrame({
@@ -166,7 +201,7 @@ def main():
     print("Tokens processed: {}".format(len(df_split)))
     print("Uploading tokens...")
     upload_time = time()
-    upload(df_split, "tokens", TABLE_NAME, TOKEN)
+    s3.upload(df_split, "tokens", TABLE_NAME, TOKEN)
     upload_time = time() - upload_time
     # sql.complete_processing(engine, TABLE_NAME, "tokens")
 

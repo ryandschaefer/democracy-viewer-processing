@@ -115,13 +115,12 @@ def download(folder: str, name: str, token: str | None = None) -> pl.LazyFrame:
     
     return df
 
-def download_file(folder: str, name: str, token: str | None = None) -> str:
+def download_file(local_file: str, folder: str, name: str, token: str | None = None):
     distributed = get_creds(token)
     
-    download_path = "{}/{}/{}".format(BASE_PATH, folder, name)
-    if os.path.exists(download_path):
+    if os.path.exists(local_file):
         # Do nothing if file already downloaded
-        print("{} already exists".format(name))
+        print("{} already exists".format(local_file))
     else:
         # Download file from s3
         if "key_" in distributed.keys() and "secret" in distributed.keys():
@@ -137,14 +136,12 @@ def download_file(folder: str, name: str, token: str | None = None) -> str:
                 region_name = distributed["region"]
             )
         path = "{}/{}".format(folder, name)
-            
+        
         start_time = time()
         s3_client.download_file(
             distributed["bucket"],
             path,
-            download_path,
+            local_file,
             Config = config
         )
         print("Download time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
-    
-    return download_path
