@@ -39,7 +39,7 @@ def model_similar_words(df: pd.DataFrame, table_name: str, num_threads: int, tok
     upload_file(local_folder, s3_folder, name, token)
 
 def model_similar_words_over_group(df: pd.DataFrame, group_col: str, table_name: str, num_threads: int, token: str | None = None):
-    time_values = sorted(df[group_col].unique())
+    time_values = sorted(df[group_col].astype(str).unique())
     times = []
 
     for i, time_value in enumerate(time_values):

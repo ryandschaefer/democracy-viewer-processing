@@ -3,13 +3,15 @@ start_time = time()
 from dotenv import load_dotenv
 load_dotenv()
 import datetime as dt
+from functools import partial
 import humanize
+import multiprocessing as mp
 from nltk.corpus import stopwords
 import polars as pl
 import re
 import sys
 # Database interaction
-from util.s3 import upload
+import util.s3 as s3
 # SQL helpers
 from util.sql_connect import sql_connect
 import util.data_queries as data
@@ -39,14 +41,50 @@ engine, meta = sql_connect()
 # Get metadata to determine preprocessing type
 metadata = sql.get_metadata(engine, meta, TABLE_NAME)
 
+# Load stopwords file if it exists
+try:
+    s3.download_file(f"files/{ TABLE_NAME }.txt", "stopwords", f"{ TABLE_NAME }.txt", TOKEN)
+    custom_stopwords = True
+except:
+    custom_stopwords = False
+
+# Prep stop words and spacy model
 language = metadata["language"].lower()
 nlp = load_spacy_model(language)
-if language in stopwords.fileids():
-    stop_words = set(stopwords.words(language))
-    if metadata["preprocessing_type"] == "stem":
-        stop_words = list(map(lambda x: wp.stem(x, language), stop_words))
+if custom_stopwords:
+    with open(f"files/{ TABLE_NAME }.txt") as f:
+        stop_words = f.readlines()
 else:
-    stop_words = []
+    if language in stopwords.fileids():
+        stop_words = list(set(stopwords.words(language)))
+    else:
+        stop_words = []
+        
+if metadata["preprocessing_type"] == "stem":
+    stop_words2: list[str] = []
+    for word in stop_words:
+        for token in wp.stem(word, language):
+            tmp = re.sub("[^A-Za-z0-9 ]+", "", token).strip()
+            if len(tmp) > 1:
+                stop_words2.append(tmp)
+    stop_words = stop_words2
+elif metadata["preprocessing_type"] == "lemma":
+    stop_words2: list[str] = []
+    for word in stop_words:
+        doc = nlp(word)
+        for token in doc:
+            tmp = re.sub("[^A-Za-z0-9 ]+", "", token.lemma_).strip()
+            if len(tmp) > 1:
+                stop_words2.append(tmp)
+    stop_words = stop_words2
+else:
+    stop_words2: list[str] = []
+    for word in stop_words:
+        for token in wp.tokenize(word, language):
+            tmp = re.sub("[^A-Za-z0-9 ]+", "", token).strip()
+            if len(tmp) > 1:
+                stop_words2.append(tmp)
+    stop_words = stop_words2
 
 # Extract lemmas, pos, and dependencies from tokens
 def process_sentence(row, mode = "lemma"):
@@ -57,7 +95,7 @@ def process_sentence(row, mode = "lemma"):
                 "record_id": row["record_id"], "col": row["col"], "word": re.sub("[^A-Za-z0-9 ]+", "", token.lemma_.lower()), 
                 "pos": token.pos_.lower(), "tag": token.tag_.lower(), 
                 "dep": token.dep_.lower(), "head": token.head.lemma_.lower()
-            } for token in doc if not token.is_stop
+            } for token in doc if token.lemma_ not in stop_words
         ])
         
         # Return empty data frame if empty
@@ -66,7 +104,7 @@ def process_sentence(row, mode = "lemma"):
                 "record_id", "col", "word",
                 "pos", "tag", "dep", "head"
             ])
-            
+
         # Remove 1 character words
         df = df.filter(pl.col("word").str.strip_chars().str.len_chars() > 1)
     else:
@@ -76,9 +114,9 @@ def process_sentence(row, mode = "lemma"):
             words = wp.tokenize(text, metadata["language"])
         
         # Remove special characters
-        words = [re.sub("[^A-Za-z0-9 ]+", "", word) for word in words]
+        words = [re.sub("[^A-Za-z0-9 ]+", "", word).strip() for word in words]
         # Make lowercase, remove stop words and missing data
-        words = [word.lower() for word in words if word.lower() not in stop_words and len(word.strip()) > 1]
+        words = [word.lower() for word in words if word.lower() not in stop_words and len(word) > 1]
         
         # Make data frame
         df = pl.DataFrame({
@@ -89,31 +127,50 @@ def process_sentence(row, mode = "lemma"):
         
     return df
 
+def process_chunk(df: pl.DataFrame, mode = "lemma", i = 0) -> pl.DataFrame:
+    df_list: list[pl.DataFrame] = []
+    
+    start_time = time()
+    prev_time = start_time
+    for j, row in enumerate(df.iter_rows(named = True)):
+        df2 = process_sentence(row, mode)
+        if len(df2) > 0:
+            df_list.append(df2)
+            
+        curr_time = time()
+        if curr_time - prev_time > NUM_THREADS:
+            prev_time = curr_time
+            total_time = curr_time - start_time
+            its_sec = (j + 1) / total_time
+            time_left = humanize.precisedelta(dt.timedelta(seconds = (len(df) - j + 1) / its_sec))
+            print("Thread #{}: {}/{} = {}%. {} it/sec. Estimated {} remaining".format("{}".format(i+1).zfill(2), j + 1, len(df), round(100 * (j + 1) / len(df), 2), round(its_sec, 2), time_left))
+        if j + 1 == len(df):
+            print("Thread #{}: Done. Total time = {}".format("{}".format(i+1).zfill(2), humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
+    return pl.concat(df_list)
+
+def process_thread(arg: tuple[int, pl.DataFrame], mode = "lemma") -> pl.DataFrame:
+    i, df = arg
+    return process_chunk(df, mode, i)
+
 # Split the text of the given data frame
 def split_text(df: pl.DataFrame):
     start = time()
-    prev_time = time()
-  
-    split_data_list: list[pl.DataFrame] = []
-    for i, row in enumerate(df.iter_rows(named = True)):
-        df_tmp = process_sentence(row, metadata["preprocessing_type"])
-        if len(df_tmp) > 0:
-            split_data_list.append(df_tmp)
-            
-        curr_time = time()
-        if curr_time - prev_time > 5:
-            prev_time = curr_time
-            total_time = curr_time - start
-            its_sec = (i + 1) / total_time
-            time_left = humanize.precisedelta(dt.timedelta(seconds = (len(df) - (i + 1)) / its_sec))
-            print("{}/{} = {}%. {} it/sec. Estimated {} remaining".format(i + 1, len(df), round(100 * (i + 1) / len(df), 2), round(its_sec, 2), time_left))
+
+    # Multithread processing
+    chunks = list(enumerate(df.iter_slices(len(df) // NUM_THREADS + 1)))
+    parallel_function = partial(process_thread, mode=metadata["preprocessing_type"])
+    with mp.get_context("spawn").Pool(NUM_THREADS) as pool:
+        results = pool.map(parallel_function, chunks, 1)
+        pool.terminate()
+    split_data_list = [result for result in results]
             
     print("Text processing complete. Total time = {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
-    print("Merging results...")
+    print("Merging chunks...")
     split_data = pl.concat(split_data_list)
     # Delete list to free memory
     print("Cleaning memory...")
     del split_data_list
+    del chunks
     
     # Create copy to use for embeddings
     print("Creating embeddings copy...")
@@ -131,12 +188,6 @@ def split_text(df: pl.DataFrame):
     
     print("Data processing: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
     return split_data, df_split_raw
-
-# Upload data to s3
-def upload_result(df: pl.DataFrame):
-    start_time = time()
-    upload(df, "tokens", TABLE_NAME, TOKEN)
-    print("Upload time: {} seconds".format(time() - start_time))
        
 def main():  
     print("Loading data...") 
@@ -146,18 +197,23 @@ def main():
     print("Processing tokens...")   
     df_split, df_split_raw = split_text(df)
     print("Tokens processed: {}".format(len(df_split)))
-    
+    print("Uploading tokens...")
     upload_time = time()
-    upload(df_split, "tokens", TABLE_NAME, TOKEN)
+    s3.upload(df_split, "tokens", TABLE_NAME, TOKEN)
     upload_time = time() - upload_time
-    print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = upload_time))))
-    # Pause to avoid timeout if upload took too long
-    if upload_time > 60:
-        print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
-        sleep(60 * 5) # 5 minutes
-        print("5 minutes done. Resuming processing")
+    # sql.complete_processing(engine, TABLE_NAME, "tokens")
 
     if metadata["embeddings"]:
+        # Save data frame to output file in case of crash
+        # df_split_raw.write_parquet("{}_split_raw.parquet".format(TABLE_NAME), use_pyarrow=True, compression="zstd")
+        
+        # Pause to avoid timeout if upload took too long
+        if upload_time > 60:
+            print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
+            sleep(60 * 5) # 5 minutes
+            print("5 minutes done. Resuming processing")
+            
+        # Run embeddings
         print("Processing embeddings...")
         embed_time = time()
         compute_embeddings(df_split_raw.to_pandas(), metadata, TABLE_NAME, NUM_THREADS, TOKEN)
@@ -165,6 +221,10 @@ def main():
         sql.complete_processing(engine, TABLE_NAME, "embeddings")
     final_time = time() - start_time
     print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
+
+    # Delete custom stopwords if exists
+    if custom_stopwords:
+        s3.delete_stopwords(TABLE_NAME)
     
 if __name__ == "__main__":
     main()
