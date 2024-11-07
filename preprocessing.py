@@ -10,8 +10,6 @@ from nltk.corpus import stopwords
 import polars as pl
 import re
 import sys
-# from tqdm import tqdm
-# from util.email import send_email
 # Database interaction
 import util.s3 as s3
 # SQL helpers
@@ -157,7 +155,7 @@ def process_thread(arg: tuple[int, pl.DataFrame], mode = "lemma") -> pl.DataFram
 # Split the text of the given data frame
 def split_text(df: pl.DataFrame):
     start = time()
-  
+
     # Multithread processing
     chunks = list(enumerate(df.iter_slices(len(df) // NUM_THREADS + 1)))
     parallel_function = partial(process_thread, mode=metadata["preprocessing_type"])
@@ -223,7 +221,7 @@ def main():
         sql.complete_processing(engine, TABLE_NAME, "embeddings")
     final_time = time() - start_time
     print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
-    
+
     # Delete custom stopwords if exists
     if custom_stopwords:
         s3.delete_stopwords(TABLE_NAME)

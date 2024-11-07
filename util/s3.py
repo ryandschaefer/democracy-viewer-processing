@@ -2,12 +2,15 @@ import boto3
 from boto3.s3.transfer import TransferConfig
 import datetime as dt
 import humanize
+import datetime as dt
+import humanize
 import jwt
 import os
 import pandas as pd
 import polars as pl
 from time import time
 
+BASE_PATH = "files/s3"
 BASE_PATH = "files/s3"
 
 # Use TransferConfig to optimize the download
@@ -41,6 +44,7 @@ def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, token: str |
     elif type(df) == pd.DataFrame:
         df.to_parquet(local_file, "pyarrow", index = False, compression = "zstd")
     print("Conversion time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
+    print("Conversion time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     
     # Upload file to s3
     if "key_" in distributed.keys() and "secret" in distributed.keys():
@@ -57,6 +61,7 @@ def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, token: str |
         )
         
     path = "tables/{}_{}/{}.parquet".format(folder, name, name)
+    path = "tables/{}_{}/{}.parquet".format(folder, name, name)
         
     start_time = time()
     s3_client.upload_file(
@@ -66,7 +71,9 @@ def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, token: str |
         Config = config
     )
     print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
+    print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     
+def upload_file(local_folder: str, s3_folder: str, name: str, token: str | None = None) -> None:
 def upload_file(local_folder: str, s3_folder: str, name: str, token: str | None = None) -> None:
     distributed = get_creds(token)
 
@@ -86,6 +93,8 @@ def upload_file(local_folder: str, s3_folder: str, name: str, token: str | None 
         
     local_file = "{}/{}/{}".format(BASE_PATH, local_folder, name)
     path = "{}/{}".format(s3_folder, name)
+    local_file = "{}/{}/{}".format(BASE_PATH, local_folder, name)
+    path = "{}/{}".format(s3_folder, name)
       
     start_time = time()  
     s3_client.upload_file(
@@ -95,10 +104,12 @@ def upload_file(local_folder: str, s3_folder: str, name: str, token: str | None 
         Config = config
     )
     print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
+    print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     
 def download(folder: str, name: str, token: str | None = None) -> pl.LazyFrame:
     distributed = get_creds(token)
     
+    path = "tables/{}_{}/{}.parquet".format(folder, name, name)
     path = "tables/{}_{}/{}.parquet".format(folder, name, name)
         
     storage_options = {
@@ -108,6 +119,7 @@ def download(folder: str, name: str, token: str | None = None) -> pl.LazyFrame:
     }
     s3_path = "s3://{}/{}".format(distributed["bucket"], path)
     df = pl.scan_parquet(s3_path, storage_options=storage_options)
+    if folder == "tokens":
     if folder == "tokens":
         df = df.with_columns(
             record_id = pl.col("record_id").cast(pl.UInt32, strict = False)
