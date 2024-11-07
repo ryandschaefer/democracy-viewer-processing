@@ -164,3 +164,31 @@ def delete_stopwords(table_name: str, token: str | None = None):
         )
         
     s3_client.delete_object(Bucket = distributed["bucket"], Key = f"stopwords/{ table_name }.txt")
+    
+def delete_embeddings(table_name: str, token: str | None = None):
+    distributed = get_creds(token)
+    
+    if "key_" in distributed.keys() and "secret" in distributed.keys():
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id = distributed["key_"],
+            aws_secret_access_key = distributed["secret"],
+            region_name = distributed["region"]
+        )
+    else:
+        s3_client = boto3.client(
+            "s3",
+            region_name = distributed["region"]
+        )
+        
+    embed_directory = f"embeddings/{ table_name }/"
+    # List and delete all objects under the embed_directory prefix
+    paginator = s3_client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=distributed["bucket"], Prefix=embed_directory):
+        if "Contents" in page:
+            # Prepare the list of objects to delete
+            delete_objects = [{"Key": obj["Key"]} for obj in page["Contents"]]
+            # Batch delete the objects
+            s3_client.delete_objects(Bucket=distributed["bucket"], Delete={"Objects": delete_objects})
+    
+    print(f"All objects in the directory '{embed_directory}' have been deleted.")

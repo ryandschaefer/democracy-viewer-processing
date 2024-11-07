@@ -68,6 +68,20 @@ def complete_processing(engine: Engine, table_name: str, processing_type: str) -
     with engine.connect() as conn:
         conn.execute(query)
         conn.commit()
+        
+# Set processing to not done while reprocessing
+def deactivate_processing(engine: Engine, table_name: str, processing_type: str) -> None:
+    query = (
+        update(DatasetMetadata)
+            .where(DatasetMetadata.table_name == table_name)
+            .values({
+                f"{ processing_type }_done": False
+            })
+    )
+    
+    with engine.connect() as conn:
+        conn.execute(query)
+        conn.commit()
     
 # Get a user record by email
 def get_user(engine: Engine, meta: MetaData, email: str) -> dict:

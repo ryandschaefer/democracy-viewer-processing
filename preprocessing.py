@@ -198,6 +198,7 @@ def main():
     df_split, df_split_raw = split_text(df)
     print("Tokens processed: {}".format(len(df_split)))
     print("Uploading tokens...")
+    sql.deactivate_processing(engine, TABLE_NAME, "tokens")
     upload_time = time()
     s3.upload(df_split, "tokens", TABLE_NAME, TOKEN)
     upload_time = time() - upload_time
@@ -212,6 +213,11 @@ def main():
             print("Waiting 5 minutes to avoid AWS timeout starting at {} {}".format(dt.datetime.now().strftime("%H:%M:%S"), tzname[0]))
             sleep(60 * 5) # 5 minutes
             print("5 minutes done. Resuming processing")
+            
+        # Delete old embeddings if they exist
+        print("Deleting old embeddings (if necessary)...")
+        s3.delete_embeddings(TABLE_NAME, TOKEN)
+        sql.deactivate_processing(engine, TABLE_NAME, "embeddings")
             
         # Run embeddings
         print("Processing embeddings...")
