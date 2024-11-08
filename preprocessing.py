@@ -222,7 +222,8 @@ def main():
         # Run embeddings
         print("Processing embeddings...")
         embed_time = time()
-        compute_embeddings(df_split_raw.to_pandas(), metadata, TABLE_NAME, NUM_THREADS, TOKEN)
+        embed_cols = sql.get_embed_cols(engine, meta, TABLE_NAME)
+        compute_embeddings(df_split_raw.to_pandas(), embed_cols, TABLE_NAME, NUM_THREADS, TOKEN)
         embed_time = time() - embed_time
         sql.complete_processing(engine, TABLE_NAME, "embeddings")
     final_time = time() - start_time

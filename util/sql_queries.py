@@ -1,7 +1,7 @@
 # Database Interaction
 from sqlalchemy import Engine, MetaData, select, update, insert
 # Update directory to import util
-from util.sqlalchemy_tables import DatasetMetadata, DatasetTextCols, Users
+from util.sqlalchemy_tables import DatasetMetadata, DatasetEmbedCols, DatasetTextCols, Users
 
 # Get all of the metadata of a dataset
 def get_metadata(engine: Engine, meta: MetaData, table_name: str) -> dict:
@@ -54,6 +54,25 @@ def get_text_cols(engine: Engine, table_name: str) -> list[str]:
         exit(1)
     else:
         return text_cols
+    
+# Get the embedding columns of a dataset
+def get_embed_cols(engine: Engine, meta: MetaData, table_name: str) -> list[str]:
+    query = (
+        select(DatasetEmbedCols.col)
+            .where(DatasetEmbedCols.table_name == table_name)
+    )
+    embed_cols = []
+    with engine.connect() as conn:
+        for row in conn.execute(query):
+            embed_cols.append(row[0])
+        conn.commit()
+        
+    if len(embed_cols) == 0:
+        metadata = get_metadata(engine, meta, table_name)
+        if "embed_col" in metadata.keys():
+            embed_cols = [metadata["embed_col"]]
+    
+    return embed_cols
     
 # Update metadata that processing is done
 def complete_processing(engine: Engine, table_name: str, processing_type: str) -> None:

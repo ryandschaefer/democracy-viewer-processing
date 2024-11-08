@@ -49,3 +49,8 @@ class DatasetTextCols(SQL_BASE):
     table_name = Column("table_name", String(100), ForeignKey(DatasetMetadata.table_name), primary_key = True)
     col = Column("col", String(50), primary_key = True)
     
+class DatasetEmbedCols(SQL_BASE):
+    __tablename__ = "dataset_embed_cols"
+    table_name = Column("table_name", String(100), ForeignKey(DatasetMetadata.table_name), primary_key = True)
+    col = Column("col", String(50), primary_key = True)
+    
