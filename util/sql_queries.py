@@ -82,6 +82,21 @@ def deactivate_processing(engine: Engine, table_name: str, processing_type: str)
     with engine.connect() as conn:
         conn.execute(query)
         conn.commit()
+        
+# Update metadata to complete reprocessing
+def complete_reprocessing(engine: Engine, table_name: str) -> None:
+    query = (
+        update(DatasetMetadata)
+            .where(DatasetMetadata.table_name == table_name)
+            .values({
+                "reprocess_start": False,
+                "unprocessed_updates": 0
+            })
+    )
+    
+    with engine.connect() as conn:
+        conn.execute(query)
+        conn.commit()
     
 # Get a user record by email
 def get_user(engine: Engine, meta: MetaData, email: str) -> dict:

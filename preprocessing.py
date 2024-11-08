@@ -231,6 +231,9 @@ def main():
     # Delete custom stopwords if exists
     if custom_stopwords:
         s3.delete_stopwords(TABLE_NAME)
+        
+    # Finish reprocessing
+    sql.complete_reprocessing(engine, TABLE_NAME)
     
 if __name__ == "__main__":
     main()
