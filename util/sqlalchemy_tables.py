@@ -38,6 +38,7 @@ class DatasetMetadata(SQL_BASE):
     uploaded = Column("uploaded", Boolean)
     num_records = Column("num_records", Integer)
     license = Column("license", String(200))
+    reprocess_start = Column("reprocess_start", Boolean)
     
 class Tags(SQL_BASE):
     __tablename__ = "tags"
