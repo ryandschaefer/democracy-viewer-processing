@@ -69,7 +69,7 @@ def get_embed_cols(engine: Engine, meta: MetaData, table_name: str) -> list[str]
         
     if len(embed_cols) == 0:
         metadata = get_metadata(engine, meta, table_name)
-        if "embed_col" in metadata.keys():
+        if "embed_col" in metadata.keys() and metadata["embed_col"] is not None:
             embed_cols = [metadata["embed_col"]]
     
     return embed_cols

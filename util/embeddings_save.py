@@ -84,7 +84,7 @@ def model_similar_words_over_group(df: pd.DataFrame, embed_cols: list[str], tabl
 def compute_embeddings(df: pd.DataFrame, embed_cols: list[str], table_name: str, num_threads: int, token: str | None = None):
     start = time()
 
-    if len(embed_cols) > 0:
+    if embed_cols is not None and len(embed_cols) > 0:
         # select top words over GROUP and save
         df_text = data.get_columns(table_name, embed_cols, token).collect().to_pandas()
         df_merged = pd.merge(df, df_text, left_on = "record_id", right_index = True)
