@@ -1,5 +1,7 @@
 # Democracy Viewer Processing
 
+Can be used for M3. 
+
 To use the "No AWS" version of this repository, use the following command to clone the correct branch.
 
 ```bash
