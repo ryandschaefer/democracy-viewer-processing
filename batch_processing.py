@@ -19,20 +19,26 @@ import util.sql_queries as sql
 # Word processing
 from util.spacy_models import load_spacy_model
 import util.word_processing as wp
-from util.embeddings_save import compute_embeddings
+from util.embeddings_save import update_embeddings
 
 # Get table name from command line argument
 TABLE_NAME = sys.argv[1]
 
-# Get number of threads to use from second command line argument with default of 1 if not provided or not int
+# Get batch number from second command line argument
 try:
-    NUM_THREADS = int(sys.argv[2])
+    BATCH_NUM = int(sys.argv[2])
+except:
+    BATCH_NUM = 1
+
+# Get number of threads to use from third command line argument with default of 1 if not provided or not int
+try:
+    NUM_THREADS = int(sys.argv[3])
 except:
     NUM_THREADS = 1
 
 # Get distributed token if defined
 try:
-    TOKEN = sys.argv[3]
+    TOKEN = sys.argv[4]
 except:
     TOKEN = None
 
@@ -192,15 +198,14 @@ def split_text(df: pl.DataFrame):
 def main():  
     print("Loading data...") 
     load_time = time()
-    df = data.get_text(engine, TABLE_NAME, TOKEN).drop_nulls().collect()
+    df = data.get_text(engine, TABLE_NAME, BATCH_NUM, TOKEN).drop_nulls().collect()
     print("Load time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - load_time))))
     print("Processing tokens...")   
     df_split, df_split_raw = split_text(df)
     print("Tokens processed: {}".format(len(df_split)))
     print("Uploading tokens...")
-    sql.deactivate_processing(engine, TABLE_NAME, "tokens")
     upload_time = time()
-    s3.upload(df_split, "tokens", TABLE_NAME, TOKEN)
+    s3.upload(df_split, "tokens", TABLE_NAME, BATCH_NUM, TOKEN)
     upload_time = time() - upload_time
     # sql.complete_processing(engine, TABLE_NAME, "tokens")
 
@@ -216,16 +221,13 @@ def main():
             
         # Delete old embeddings if they exist
         print("Deleting old embeddings (if necessary)...")
-        s3.delete_embeddings(TABLE_NAME, TOKEN)
-        sql.deactivate_processing(engine, TABLE_NAME, "embeddings")
             
         # Run embeddings
         print("Processing embeddings...")
         embed_time = time()
         embed_cols = sql.get_embed_cols(engine, meta, TABLE_NAME)
-        compute_embeddings(df_split_raw.to_pandas(), embed_cols, TABLE_NAME, NUM_THREADS, TOKEN)
+        update_embeddings(df_split_raw.to_pandas(), embed_cols, TABLE_NAME, TOKEN)
         embed_time = time() - embed_time
-        sql.complete_processing(engine, TABLE_NAME, "embeddings")
     final_time = time() - start_time
     print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
 

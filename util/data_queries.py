@@ -4,12 +4,12 @@ import util.s3 as s3
 import util.sql_queries as sql
 
 # Retrieve data from s3 and keep required data
-def get_text(engine: Engine, table_name: str, token: str | None = None) -> pl.LazyFrame:
+def get_text(engine: Engine, table_name: str, batch: int | None = None, token: str | None = None) -> pl.LazyFrame:
     # Get all text columns
     text_cols = sql.get_text_cols(engine, table_name)
     
     # Download raw data from s3
-    df_raw = s3.download("datasets", table_name, token)
+    df_raw = s3.download("datasets", table_name, batch, token)
     # Reformat data to prep for preprocessing
     df_list: list[pl.LazyFrame] = []
     for col in text_cols:

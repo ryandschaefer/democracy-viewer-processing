@@ -31,7 +31,7 @@ def get_creds(token: str | None = None) -> dict[str, str]:
     secret = os.environ.get("TOKEN_SECRET")
     return jwt.decode(token, secret, "HS256")
 
-def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, token: str | None = None) -> None:
+def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, batch: int | None = None, token: str | None = None) -> None:
     distributed = get_creds(token)
     
     # Convert file to parquet
@@ -57,7 +57,10 @@ def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, token: str |
             region_name = distributed["region"]
         )
         
-    path = "tables/{}_{}/{}.parquet".format(folder, name, name)
+    if batch is None:
+        path = "tables/{}_{}/{}.parquet".format(folder, name, name)
+    else:
+        path = "tables/{}_{}/{}_{}.parquet".format(folder, name, name, batch)
         
     start_time = time()
     s3_client.upload_file(
@@ -97,10 +100,13 @@ def upload_file(local_folder: str, s3_folder: str, name: str, token: str | None 
     )
     print("Upload time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
     
-def download(folder: str, name: str, token: str | None = None) -> pl.LazyFrame:
+def download(folder: str, name: str, batch: int | None = None, token: str | None = None) -> pl.LazyFrame:
     distributed = get_creds(token)
     
-    path = "tables/{}_{}/{}.parquet".format(folder, name, name)
+    if batch is None:
+        path = "tables/{}_{}/{}.parquet".format(folder, name, name)
+    else:
+        path = "tables/{}_{}/{}_{}.parquet".format(folder, name, name, batch)
         
     storage_options = {
         "aws_access_key_id": distributed["key_"],
