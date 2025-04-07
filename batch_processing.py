@@ -196,6 +196,11 @@ def split_text(df: pl.DataFrame):
     return split_data, df_split_raw
        
 def main():  
+    print("Moving dataset to datasets folder...")
+    move_time = time()
+    df = s3.download("raw_uploads", TABLE_NAME, BATCH_NUM, TOKEN)
+    s3.upload(df.collect(), "datasets", TABLE_NAME, BATCH_NUM, TOKEN)
+    print("Move time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - move_time))))
     print("Loading data...") 
     load_time = time()
     df = data.get_text(engine, TABLE_NAME, BATCH_NUM, TOKEN).drop_nulls().collect()

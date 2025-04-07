@@ -190,9 +190,14 @@ def split_text(df: pl.DataFrame):
     return split_data, df_split_raw
        
 def main():  
+    print("Moving dataset to datasets folder...")
+    move_time = time()
+    df = s3.download("raw_uploads", TABLE_NAME, None, TOKEN)
+    s3.upload(df.collect(), "datasets", TABLE_NAME, None, TOKEN)
+    print("Move time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - move_time))))
     print("Loading data...") 
     load_time = time()
-    df = data.get_text(engine, TABLE_NAME, TOKEN).drop_nulls().collect()
+    df = data.get_text(engine, TABLE_NAME, None, TOKEN).drop_nulls().collect()
     print("Load time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - load_time))))
     print("Processing tokens...")   
     df_split, df_split_raw = split_text(df)
@@ -200,7 +205,7 @@ def main():
     print("Uploading tokens...")
     sql.deactivate_processing(engine, TABLE_NAME, "tokens")
     upload_time = time()
-    s3.upload(df_split, "tokens", TABLE_NAME, TOKEN)
+    s3.upload(df_split, "tokens", TABLE_NAME, None, TOKEN)
     upload_time = time() - upload_time
     # sql.complete_processing(engine, TABLE_NAME, "tokens")
 
