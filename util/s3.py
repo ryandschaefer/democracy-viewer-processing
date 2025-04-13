@@ -103,16 +103,10 @@ def upload_file(local_folder: str, s3_folder: str, name: str, token: str | None 
 def download(folder: str, name: str, batch: int | None = None, token: str | None = None) -> pl.LazyFrame:
     distributed = get_creds(token)
     
-    if folder == "temp_uploads":
-        if batch is None:
-            path = "temp_uploads/{}.csv".format( name)
-        else:
-            path = "temp_uploads/{}_{}.csv".format(name, batch)
+    if batch is None:
+        path = "tables/{}_{}/{}.parquet".format(folder, name, name)
     else:
-        if batch is None:
-            path = "tables/{}_{}/{}.csv".format(folder, name, name)
-        else:
-            path = "tables/{}_{}/{}_{}.csv".format(folder, name, name, batch)
+        path = "tables/{}_{}/{}-{}.parquet".format(folder, name, name, batch)
         
     storage_options = {
         "aws_access_key_id": distributed["key_"],
@@ -120,7 +114,7 @@ def download(folder: str, name: str, batch: int | None = None, token: str | None
         "aws_region": distributed["region"],
     }
     s3_path = "s3://{}/{}".format(distributed["bucket"], path)
-    df = pl.scan_csv(s3_path, storage_options=storage_options)
+    df = pl.scan_parquet(s3_path, storage_options=storage_options)
     if folder == "tokens":
         df = df.with_columns(
             record_id = pl.col("record_id").cast(pl.UInt32, strict = False)
