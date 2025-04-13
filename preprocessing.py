@@ -2,8 +2,10 @@ from time import time, sleep, tzname
 start_time = time()
 from dotenv import load_dotenv
 load_dotenv()
+import boto3
 import datetime as dt
 import humanize
+import os
 import sys
 # Database interaction
 import util.s3 as s3
@@ -82,13 +84,40 @@ def main():
         sql.complete_processing(engine, TABLE_NAME, "embeddings")
     final_time = time() - start_time
     print("Total time: {}".format(humanize.precisedelta(dt.timedelta(seconds = final_time))))
-
-    # Delete custom stopwords if exists
-    # if custom_stopwords:
-    #     s3.delete_stopwords(TABLE_NAME)
-        
+    
     # Finish reprocessing
     sql.complete_reprocessing(engine, TABLE_NAME)
+
+    # Update batches in sql
+    if BATCH_NUM is None:
+        sql.complete_batch(engine, TABLE_NAME, 1)
+        
+    else:
+        sql.complete_batch(engine, TABLE_NAME, BATCH_NUM)
+    
+        # Start next batch if there is one
+        if BATCH_NUM < metadata["num_batches"]:
+            # Initialize the AWS Batch client
+            batch_client = boto3.client('batch')
+            
+            # Setup input parameters
+            name = f"table_name-{ BATCH_NUM }"
+            params = {
+                "table_name": TABLE_NAME,
+                "num_threads": NUM_THREADS,
+                "batch_num": BATCH_NUM
+            }
+
+            # Submit the job
+            response = batch_client.submit_job(
+                jobName=name,
+                jobQueue=os.getenv('BATCH_QUEUE_LARGE'),
+                jobDefinition=os.getenv('BATCH_DEF_LARGE'),
+                parameters=params
+            )
+            
+            print("Batch job submitted:")
+            print(response)
     
 if __name__ == "__main__":
     main()

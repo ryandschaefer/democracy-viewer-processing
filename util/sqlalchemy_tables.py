@@ -39,6 +39,8 @@ class DatasetMetadata(SQL_BASE):
     num_records = Column("num_records", Integer)
     license = Column("license", String(200))
     reprocess_start = Column("reprocess_start", Boolean)
+    num_batches = Column("num_batches", Integer)
+    batches_done = Column("batches_done", Integer)
     
 class Tags(SQL_BASE):
     __tablename__ = "tags"

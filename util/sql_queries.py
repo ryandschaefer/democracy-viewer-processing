@@ -136,3 +136,17 @@ def get_user(engine: Engine, meta: MetaData, email: str) -> dict:
         record[col] = output[i]
         
     return record
+
+# Update the number of batches completed
+def complete_batch(engine: Engine, table_name: str, batch_num: int):
+    query = (
+        update(DatasetMetadata)
+            .where(DatasetMetadata.table_name == table_name)
+            .values({
+                "batches_done": batch_num
+            })
+    )
+    
+    with engine.connect() as conn:
+        conn.execute(query)
+        conn.commit()

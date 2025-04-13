@@ -7,6 +7,7 @@ WORKDIR /usr/src/app
 ADD . .
 
 # Install Python dependencies
+RUN git
 RUN python3.11 -m pip install -r requirements.txt
 
 # Install NLTK packages
