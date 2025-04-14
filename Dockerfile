@@ -1,4 +1,4 @@
-FROM public.ecr.aws/lambda/python:3.11
+FROM amazonlinux:latest
 
 # Set the working directory within docker image
 WORKDIR /usr/src/app
@@ -7,7 +7,7 @@ WORKDIR /usr/src/app
 ADD . .
 
 # Install Python dependencies
-RUN yum install -y git
+RUN yum install -y python3.11 python3.11-pip git
 RUN python3.11 -m pip install -r requirements.txt
 
 # Install NLTK packages
@@ -34,4 +34,4 @@ RUN python3.11 -m spacy download ru_core_news_sm
 RUN python3.11 -m spacy download es_core_news_sm
 # Third party language models
 ### Latin
-RUN python3.11 -m pip install https://huggingface.co/latincy/la_core_web_sm/resolve/main/la_core_web_sm-any-py3-none-any.whl
+# RUN python3.11 -m pip install https://huggingface.co/latincy/la_core_web_sm/resolve/main/la_core_web_sm-any-py3-none-any.whl
