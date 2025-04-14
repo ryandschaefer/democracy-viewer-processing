@@ -25,7 +25,7 @@ def get_text(engine: Engine, table_name: str, batch: int | None = None, token: s
     return df
 
 # Get the values of a subset of columns for each record
-def get_columns(table_name: str, columns: list[str], token: str | None = None) -> pl.LazyFrame:
-    df = s3.download("datasets", table_name, token)
+def get_columns(table_name: str, columns: list[str], batch: int | None = None, token: str | None = None) -> pl.LazyFrame:
+    df = s3.download("datasets", table_name, batch, token)
     
-    return df.select(columns)
+    return df.select(["record_id"] + columns)

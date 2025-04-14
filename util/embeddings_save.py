@@ -172,23 +172,28 @@ def compute_embeddings(df: pd.DataFrame, embed_cols: list[str], table_name: str,
     if embed_cols is not None and len(embed_cols) > 0:
         # select top words over GROUP and save
         df_text = data.get_columns(table_name, embed_cols, token).collect().to_pandas()
-        df_merged = pd.merge(df, df_text, left_on = "record_id", right_index = True)
+        df_merged = pd.merge(df, df_text, on = "record_id")
         model_similar_words_over_group(df_merged, embed_cols, table_name, num_threads, token)
     else:
         model_similar_words(df, table_name, num_threads, token)
         
     print("Embeddings: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
     
-def update_embeddings(df: pd.DataFrame, embed_cols: list[str], table_name: str, token: str | None = None):
+def update_embeddings(df: pd.DataFrame, embed_cols: list[str], table_name: str, batch: int | None, token: str | None = None):
     start = time()
 
     if embed_cols is not None and len(embed_cols) > 0:
         # select top words over GROUP and save
-        df_text = data.get_columns(table_name, embed_cols, token).collect().to_pandas()
-        df_merged = pd.merge(df, df_text, left_on = "record_id", right_index = True)
+        df_text = data.get_columns(table_name, embed_cols, batch, token).collect().to_pandas()
+        df_merged = pd.merge(df, df_text, on = "record_id")
         update_similar_words_over_group(df_merged, embed_cols, table_name, token)
     else:
         update_similar_words(df, table_name, token)
         
     print("Embeddings: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start))))
         
+def start_embeddings(df: pd.DataFrame, embed_cols: list[str], table_name: str, num_threads: int, batch: int | None, token: str | None = None):
+    if batch is None:
+        compute_embeddings(df, embed_cols, table_name, num_threads, token)
+    else:
+        update_embeddings(df, embed_cols, table_name, batch, token)

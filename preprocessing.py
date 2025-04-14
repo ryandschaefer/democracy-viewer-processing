@@ -14,7 +14,7 @@ from util.sql_connect import sql_connect
 import util.data_queries as data
 import util.sql_queries as sql
 # Word processing
-from util.embeddings_save import compute_embeddings, update_embeddings
+from util.embeddings_save import start_embeddings
 from util.processing_functions import DataProcessing
        
 def main():  
@@ -55,7 +55,7 @@ def main():
     upload_time = time()
     s3.upload(df_split, "tokens", TABLE_NAME, BATCH_NUM)
     upload_time = time() - upload_time
-    # sql.complete_processing(engine, TABLE_NAME, "tokens")
+    sql.complete_processing(engine, TABLE_NAME, "tokens")
 
     if metadata["embeddings"]:
         # Save data frame to output file in case of crash
@@ -77,10 +77,7 @@ def main():
         print("Processing embeddings...")
         embed_time = time()
         embed_cols = sql.get_embed_cols(engine, meta, TABLE_NAME)
-        if BATCH_NUM is None:
-            compute_embeddings(df_split_raw.to_pandas(), embed_cols, TABLE_NAME, NUM_THREADS)
-        else:
-            update_embeddings(df_split_raw.to_pandas(), embed_cols, TABLE_NAME)
+        start_embeddings(df_split_raw.to_pandas(), embed_cols, TABLE_NAME, NUM_THREADS, BATCH_NUM)
         embed_time = time() - embed_time
         sql.complete_processing(engine, TABLE_NAME, "embeddings")
     final_time = time() - start_time

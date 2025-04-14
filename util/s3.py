@@ -160,29 +160,6 @@ def download_file(local_file: str, folder: str, name: str, token: str | None = N
             Config = config
         )
         print("Download time: {}".format(humanize.precisedelta(dt.timedelta(seconds = time() - start_time))))
-        
-def delete_temp_dataset(table_name: str, batch: int | None = None, token: str | None = None):
-    distributed = get_creds(token)
-    
-    if "key_" in distributed.keys() and "secret" in distributed.keys():
-        s3_client = boto3.client(
-            "s3",
-            aws_access_key_id = distributed["key_"],
-            aws_secret_access_key = distributed["secret"],
-            region_name = distributed["region"]
-        )
-    else:
-        s3_client = boto3.client(
-            "s3",
-            region_name = distributed["region"]
-        )
-        
-    if batch is None:
-        path = f"temp_uploads/{ table_name }.csv"
-    else:
-        path = f"temp_uploads/{ table_name }_{ batch }.csv"
-        
-    s3_client.delete_object(Bucket = distributed["bucket"], Key = path)
 
 def delete_stopwords(table_name: str, token: str | None = None):
     distributed = get_creds(token)
