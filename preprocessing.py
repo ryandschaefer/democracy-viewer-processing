@@ -101,11 +101,11 @@ def main():
             batch_client = boto3.client('batch')
             
             # Setup input parameters
-            name = f"table_name-{ BATCH_NUM }"
+            name = f"table_name-{ BATCH_NUM + 1 }"
             params = {
                 "table_name": TABLE_NAME,
                 "num_threads": NUM_THREADS,
-                "batch_num": BATCH_NUM
+                "batch_num": BATCH_NUM + 1
             }
 
             # Submit the job
