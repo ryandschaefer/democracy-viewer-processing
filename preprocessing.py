@@ -68,9 +68,10 @@ def main():
             print("5 minutes done. Resuming processing")
             
         # Delete old embeddings if they exist
-        print("Deleting old embeddings (if necessary)...")
-        s3.delete_embeddings(TABLE_NAME)
-        sql.deactivate_processing(engine, TABLE_NAME, "embeddings")
+        if BATCH_NUM is None:
+            print("Deleting old embeddings (if necessary)...")
+            s3.delete_embeddings(TABLE_NAME)
+            sql.deactivate_processing(engine, TABLE_NAME, "embeddings")
             
         # Run embeddings
         print("Processing embeddings...")
