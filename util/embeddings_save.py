@@ -143,15 +143,14 @@ def update_similar_words_over_group(df: pd.DataFrame, embed_cols: list[str], tab
                 
                 start_time = time()
                 
-                name = "model_{}_{}".format(group_col, time_value)
-                pkl_model_file_name = "{}/{}/{}.pkl".format(BASE_PATH, "embeddings", name)
+                name = "model_{}_{}.pkl".format(group_col, time_value)
+                pkl_model_file_name = "{}/{}/{}".format(BASE_PATH, "embeddings", name)
                 
                 cleaned_texts = prepare_text(df[df[group_col] == time_value])
                 try:
                     model = load_data_from_pkl(table_name, name, token)
                     model = update_word2vec(model, cleaned_texts)
                 except Exception as err:
-                    print(err)
                     if str(err) == "Failed to load embedding":
                         print("Model does not exist. Training new model...")
                         model = train_word2vec(cleaned_texts)
