@@ -51,11 +51,12 @@ def main():
     print("Tokens processed: {}".format(len(df_split)))
     # Upload results
     print("Uploading tokens...")
-    sql.deactivate_processing(engine, TABLE_NAME, "tokens")
+    if BATCH_NUM is None or BATCH_NUM == 1:
+        sql.deactivate_processing(engine, TABLE_NAME, "tokens")
     upload_time = time()
     s3.upload(df_split, "tokens", TABLE_NAME, BATCH_NUM)
     upload_time = time() - upload_time
-    sql.complete_processing(engine, TABLE_NAME, "tokens")
+    # sql.complete_processing(engine, TABLE_NAME, "tokens")
 
     if metadata["embeddings"]:
         # Save data frame to output file in case of crash
@@ -68,7 +69,7 @@ def main():
             print("5 minutes done. Resuming processing")
             
         # Delete old embeddings if they exist
-        if BATCH_NUM is None:
+        if BATCH_NUM is None or BATCH_NUM == 1:
             print("Deleting old embeddings (if necessary)...")
             s3.delete_embeddings(TABLE_NAME)
             sql.deactivate_processing(engine, TABLE_NAME, "embeddings")
@@ -90,6 +91,29 @@ def main():
     if BATCH_NUM is None:
         sql.complete_batch(engine, TABLE_NAME, 1)
         
+        # Start next batch if there is one
+        if metadata["num_batches"] > 1:
+            # Initialize the AWS Batch client
+            batch_client = boto3.client('batch')
+            
+            # Setup input parameters
+            name = f"{ TABLE_NAME }-{ 2 }"
+            params = {
+                "table_name": TABLE_NAME,
+                "num_threads": str(NUM_THREADS),
+                "batch_num": "2"
+            }
+
+            # Submit the job
+            response = batch_client.submit_job(
+                jobName=name,
+                jobQueue=os.getenv('BATCH_QUEUE_LARGE'),
+                jobDefinition=os.getenv('BATCH_DEF_LARGE'),
+                parameters=params
+            )
+            
+            print("Batch job submitted:")
+            print(response)
     else:
         sql.complete_batch(engine, TABLE_NAME, BATCH_NUM)
     
@@ -99,11 +123,11 @@ def main():
             batch_client = boto3.client('batch')
             
             # Setup input parameters
-            name = f"table_name-{ BATCH_NUM + 1 }"
+            name = f"{ TABLE_NAME }-{ BATCH_NUM + 1 }"
             params = {
                 "table_name": TABLE_NAME,
-                "num_threads": NUM_THREADS,
-                "batch_num": BATCH_NUM + 1
+                "num_threads": str(NUM_THREADS),
+                "batch_num": str(BATCH_NUM + 1)
             }
 
             # Submit the job

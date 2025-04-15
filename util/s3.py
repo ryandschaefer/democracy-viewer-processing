@@ -60,7 +60,7 @@ def upload(df: pl.DataFrame | pd.DataFrame, folder: str, name: str, batch: int |
     if batch is None:
         path = "tables/{}_{}/{}.parquet".format(folder, name, name)
     else:
-        path = "tables/{}_{}/{}_{}.parquet".format(folder, name, name, batch)
+        path = "tables/{}_{}/{}-{}.parquet".format(folder, name, name, batch)
         
     start_time = time()
     s3_client.upload_file(
