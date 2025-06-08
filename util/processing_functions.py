@@ -32,6 +32,7 @@ class DataProcessing:
         # Prep stop words and spacy model
         language = self.metadata["language"].lower()
         nlp = load_spacy_model(language)
+        nlp.max_length = 2000000
         if custom_stopwords:
             with open(f"files/{ self.table_name }.txt") as f:
                 stop_words = f.readlines()
