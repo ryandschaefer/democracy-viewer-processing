@@ -17,5 +17,5 @@ def stem(text: str, language: str = "English") -> list[str]:
 # Lemmatizer
 def lemmatize(text: str, language: str = "English") -> list[str]:
     nlp = load_spacy_model(language)
-    nlp.max_length = 2000000
+    nlp.max_length = 8000000
     return [ token.lemma_ for token in nlp(text) ]
