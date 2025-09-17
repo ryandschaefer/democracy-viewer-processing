@@ -22,9 +22,17 @@ class DataProcessing:
         start = time()
         print("Loading stop words...")
         
+        # Define pronouns to keep
+        pronouns_to_keep = {
+            'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves',
+            'you', 'your', 'yours', 'yourself', 'yourselves',
+            'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself',
+            'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves'
+        }
+        
         # Load stopwords file if it exists
         try:
-            s3.download_file(f"files/{ self.table_name }.txt", "stopwords", f"{ self.table_name }.txt")
+            s3.download_file(f"files/{self.table_name}.txt", "stopwords", f"{self.table_name}.txt")
             custom_stopwords = True
         except:
             custom_stopwords = False
@@ -33,12 +41,15 @@ class DataProcessing:
         language = self.metadata["language"].lower()
         nlp = load_spacy_model(language)
         nlp.max_length = 8000000
+        
         if custom_stopwords:
-            with open(f"files/{ self.table_name }.txt") as f:
+            with open(f"files/{self.table_name}.txt") as f:
                 stop_words = f.readlines()
         else:
             if language in stopwords.fileids():
                 stop_words = list(set(stopwords.words(language)))
+                # Remove pronouns from stopwords list
+                stop_words = [word for word in stop_words if word.lower() not in pronouns_to_keep]
             else:
                 stop_words = []
                 
