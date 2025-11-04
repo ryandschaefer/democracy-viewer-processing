@@ -8,13 +8,8 @@ def get_text(engine: Engine, table_name: str, batch: int | None = None, token: s
     # Get all text columns
     text_cols = sql.get_text_cols(engine, table_name)
     
-    # Download raw data from s3
-    if batch is None:
-        # Initial processing - read CSV from temp_uploads
-        df_raw = s3.download("temp_uploads", table_name, batch, token)
-    else:
-        # Batch processing - read parquet from datasets
-        df_raw = s3.download("datasets", table_name, batch, token)
+    # Download raw data from s3 -- Lambda always uploads parquet to datasets folder, regardless of batch number
+    df_raw = s3.download("datasets", table_name, batch, token)
 
     # Reformat data to prep for preprocessing
     df_list: list[pl.LazyFrame] = []
@@ -32,9 +27,6 @@ def get_text(engine: Engine, table_name: str, batch: int | None = None, token: s
 
 # Get the values of a subset of columns for each record
 def get_columns(table_name: str, columns: list[str], batch: int | None = None, token: str | None = None) -> pl.LazyFrame:
-    if batch is None:
-        df = s3.download("temp_uploads", table_name, batch, token)
-    else:
-        df = s3.download("datasets", table_name, batch, token)
+    df = s3.download("datasets", table_name, batch, token)
     
     return df.select(["record_id"] + columns)
